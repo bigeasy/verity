@@ -1,0 +1,42 @@
+VERITY
+
+Cross-platform UI testing grid for web applications.
+
+    Home:           http://bigeasy.github.com/verity
+    Source:         http://github.com/bigeasy/verity
+    Documentation:  http://github.com/bigeasy/verity/wiki
+
+    Issues:         http://github.com/bigeasy/verity/issues
+
+    License: The MIT License
+
+PURPOSE
+
+This is the patchwork of code that creates a Verity Grid. The Verity Grid is a
+semi-automatic cross-platform web user interface testing apparatus.
+
+Here's how Verity works:
+
+ * Verity Grid uses a minimal Greasemonkey script to automate page navigateion
+   and ensure that a stalled browser can find its way back to home base 
+ * A Verity Report Server issues test jobs to web browsers that visit the page
+   with the Greasemonkey script installed and configured for that particular
+   test server.
+ * Verity Grid extends QUnit so that your QUnit tests can report their outcomes
+   to the Verity Report Server.
+ * Verity works with FuncUnit/Syn so that you have a JavaScript based automation
+   langauge to write your tests in JavaScript, a language that you must already
+   be familair with, if you're building web applications.
+
+How do you build a Verity Grid? Use VirtualBox, VMWare, Parallels to run guest
+operating systems. Install Greasemonkey and the Verity Launcher on the brower
+and navigate to your Verity Report Server. Now, leave it alone. The browser will
+accept jobs, run them, and return home to the Verity Report Server.
+
+Verity is a recipe with apparatus for OS X and Linux that simplifies the
+necessary evil of  testing Interent Explorer, simplifies cross-platform testing.
+
+Verity is meant to run continuously, as you develop, instead of at check in. It
+is part of your development enviornment, so you are constantly aware of the
+health of your application, so that you are  able to jump in and fix problems as
+they occur.
