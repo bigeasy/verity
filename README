@@ -20,8 +20,8 @@ semi-automatic cross-platform web user interface testing apparatus.
 Here's how Verity works:
 
  * Verity Grid runs a Node.js server from an OS X or Linux host, and tests web
-   applications on any platform running in IE 6/9, Firefox, Chrome, Safari
-   or Opera.
+   applications on any platform running in IE 6/9, Firefox, Chrome, Safari or
+   Opera.
  * Verity Grid uses a minimal Greasemonkey script to automate page navigateion
    and ensure that a stalled browser can find its way back to home base 
  * A Verity Report Server issues test jobs to web browsers that visit the page
