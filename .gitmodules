@@ -1,0 +1,6 @@
+[submodule "vendor/jquery"]
+	path = vendor/jquery
+	url = git://github.com/jquery/jquery.git
+[submodule "vendor/blueprint-css"]
+	path = vendor/blueprint-css
+	url = git://github.com/joshuaclayton/blueprint-css.git
