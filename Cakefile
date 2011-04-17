@@ -19,6 +19,7 @@ task "gitignore", "create a .gitignore for node-ec2 based on git branch", ->
                 .DS_Store
                 **/.DS_Store
                 configuration.json
+                src/stylesheets/screen.less
                 lib
                 
                 '''
@@ -206,9 +207,9 @@ mkdir = (dirs...)  ->
 compile = (callback) ->
   commands = []
   try
-    stat = fs.statSync "vendor/blueprint-css/blueprint/screen.less"
+    stat = fs.statSync "src/stylesheets/screen.less"
   catch e
-    commands.push [ "ln", [ "-s", "screen.css", "vendor/blueprint-css/blueprint/screen.less" ] ]
+    commands.push [ "ln", [ "-s", "../../vendor/blueprint-css/blueprint/screen.css", "src/stylesheets/screen.less" ] ]
   mkdir "lib", "public/javascripts", "public/stylesheets", "eco", "queries"
   coffeeSearch "src/lib", "lib", commands
   coffeeSearch "src/javascripts", "public/javascripts", commands
