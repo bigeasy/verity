@@ -117,6 +117,56 @@ class Reactor
     else
       null
 
+  collections:
+    schedule: (model, params, next) ->
+      @sql "getShiftsByPerson", [ params.personId, params.start, params.end ], "shift", (error, results) =>
+        throw error if error
+        model.shifts = results
+        next()
+    person: (model, params, next) ->
+      @sql "getPerson", [ params.personId ], "person", (error, results) =>
+        throw error if error
+        model.person = results.shift()
+        next()
+
+  collect: (params, values, callback) ->
+    index = 0
+    queries = []
+    data = {}
+    for query in values.split /,\s+/
+      queries.push @collections[query]
+    next = =>
+      if index < queries.length
+        queries[index++].call this, data, params, next
+      else
+        callback(data)
+    next()
+
+  utc: (date) ->
+    if date.toUTCString
+      date.toUTCString()
+    else
+      new Date(date).toUTCString()
+
+  people: ->
+    (callback) =>
+      @sql "getPeople", [], "person", @safely (error, people) ->
+        callback(error) if error
+        for person in people
+          person.label = "#{person.firstName} #{person.lastName}"
+        callback(null, people)
+
+  sundayOrLastSunday: (date) ->
+    now = if date then (new Date(date)) else (new Date())
+    now.setUTCMilliseconds(0)
+    now.setUTCSeconds(0)
+    now.setUTCMinutes(0)
+    now.setUTCHours(0)
+    sat = now
+    while sat.getUTCDay() != 0
+      sat = new Date(+(sat) - DAY)
+    sat
+
   # Keeping it simple and using form encoding and query strings. These methods
   # convert string parameters into numbers and booleans so that the code isn't
   # littered with `parseInt` and `is "true"`. They are an explicit statement on
@@ -158,141 +208,9 @@ react = (->
 # reactor...
 routes = (app) ->
   app.get "/verity", react ->
-    @sendTemplate "welcome.html.eco", {}
-
-  app.get "/users.js", react ->
-    loadObject { people: @people() }, @safely (error, {people}) =>
-      throw error if error
-      @sendObject { people }
-
-  app.get "/schedule/woof/:id", react ->
-    params = [ @request.params.id ]
-    @sql "getPersonByLegacyId", params, "person", @safely (error, people) =>
-      throw error if error
-      person = people.shift()
-      if person
-        @sendRedirect "/schedule/#{person.id}"
-      else
-        @next()
-
-  app.get "/schedule/:id", react ->
-    params = { personId: @request.params.id }
-    start = @sundayOrLastSunday().getTime()
-    params.start = @epoch(@sundayOrLastSunday().getTime())
-    params.end = @epoch(start + WEEK)
-    @collect params, "person, schedule", @safely (model) =>
-      @sendTemplate "schedule.html.eco", merge model, { tz }
-
-  app.get "/calendar", react ->
-    if not @request.cookies.authenticated
-      @sendRedirect "/login"
-    else
-      today = @sundayOrLastSunday()
-      weeks = []
-      for i in [0..1]
-        week = []
-        for j in [0..6]
-          week.push today
-          today = new Date(+(today) + DAY)
-        weeks.push week
-      @sendTemplate "calendar.html.eco", { weeks, tz }
-
-  app.get "/login", react ->
-    @sendTemplate "login.html.eco", {}
-
-  app.get "/shifts.js", react ->
-    query = url.parse(@request.url, true).query
-    query = @integers(query, "from to")
-    query.from or= @sundayOrLastSunday().getTime()
-    query.to or= query.from + (5 * WEEK)
-
-    @sql "getShifts", [ @epoch(query.from), @epoch(query.to) ], "shift", @safely (error, shifts) =>
-      throw error if error
-      @sendObject({ shifts })
-
-  app.get "/now.js", react ->
-    now = new Date()
-    now.setUTCMilliseconds(0)
-    now.setUTCSeconds(0)
-    now.setUTCMinutes(0)
-    now.setUTCHours(0)
-    @sendObject({ now: now.getTime() })
-
-  app.get "/prototypes", react ->
-    @sql "getPrototypes", [], "prototype", @safely (error, prototypes) =>
-      throw error if error
-      @sendObject { prototypes }
-
-  app.get "/prototype-shifts", react ->
-    @sql "getShiftsByPrototype", [], "shift", @safely (error, shifts) =>
-      throw error if error
-      @sendObject { shifts }
-
-  app.post "/authenticate", react ->
-    if @request.body.password is "justice1998"
-      @sendRedirect "/calendar", { "Set-Cookie": "authenticated=true" }
-    else
-      @sendRedirect "/login"
-
-  app.post "/shift", react ->
-      body = @request.body
-      body = @integers(body, "shiftStart actualStart shiftLength personId prototypeId")
-
-      shiftStart = body.shiftStart
-      shiftEnd = shiftStart + (12 * HOUR)
-
-      if not body.shiftLength
-        body.shiftLength = 12 * HOUR
-
-      if body.actualStart
-        actualStart = body.actualStart
-        actualEnd = actualStart + body.shiftLength
-      else
-        actualStart = shiftStart
-        actualEnd = shiftEnd
-
-      body.prototypeId or= 1
-      console.log body
-
-      @sql "deleteShift", [ body.prototypeId, @epoch(shiftStart), body.personId ], @safely (error, results) =>
-        throw error if error
-        params = [
-          body.prototypeId
-          @epoch(shiftStart)
-          @epoch(shiftEnd)
-          @epoch(actualEnd)
-          body.personId
-          body.note
-          body.style
-        ]
-        @sql "insertShift", params, @safely (error, results) =>
-          throw error if error
-          if results.affectedRows is 0
-            console.log "Unable to insert shift."
-            console.log params
-            process.exit 1
-          @sendObject({ success: true })
-
-  app.post "/shift-delete", react ->
-    body = @request.body
-    body = @integers(body, "shiftStart personId prototypeId")
-    body.prototypeId or= 1
-
-    @sql "deleteShift", [ body.prototypeId, @epoch(body.shiftStart), body.personId ], @safely (error, results) =>
-      throw error if error
-      @sendObject({ success: true })
-
-  app.post "/prototype", react ->
-    body = @request.body
-    body = @integers(body, "id")
-    if body.id
-      @sql "updatePrototype", [ body.name, body.id ], @safely (error, results) =>
-        throw error if error
-        @sendObject({ success: true })
-    else
-      @sql "insertPrototype", [ body.name ], @safely (error, results) =>
-        throw error if error
-        @sendObject({ success: true, prototypeId: results.insertId })
+    @sql "configuration", [ 1 ], "configuration", (configurations) =>
+      console.log configurations
+      @sendTemplate "verity.html.eco", configuration
 
 server = connect.createServer(
   connect.logger(),
