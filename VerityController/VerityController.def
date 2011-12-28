@@ -1,0 +1,6 @@
+LIBRARY VerityController
+EXPORTS
+DllRegisterServer   PRIVATE
+DllUnregisterServer PRIVATE
+DllCanUnloadNow     PRIVATE
+DllGetClassObject   PRIVATE
