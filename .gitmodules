@@ -4,3 +4,9 @@
 [submodule "vendor/blueprint-css"]
 	path = vendor/blueprint-css
 	url = git://github.com/joshuaclayton/blueprint-css.git
+[submodule "vendor/twinkie"]
+	path = vendor/twinkie
+	url = git://github.com/bigeasy/twinkie.git
+[submodule "vendor/reactor"]
+	path = vendor/reactor
+	url = git@bled.prettyrobots.com:reactor.git
