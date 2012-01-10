@@ -71,6 +71,14 @@ GetIDsOfNames(
     return DISP_E_UNKNOWNNAME;
 }
 
+// TODO XHR doe snot have timeout mechanism, so we're going to have to use the
+// special timer ActiveX object that came along with Internet Explorer and XHR.
+// TODO This needs to be called IScriptInjector. It uses the peculiar behavior
+// of IXMLHttpRequest, that of accepting an IDispatch interface objet as a
+// readystatechange handler, through direct assignment of the handler, but not
+// through QueryInterface.
+// TODO Create a QueryInterface that will assert to ensure that IXHMLHttpRequest
+// does what we expect it to do, out of curiosity more than correctness. 
 typedef struct CReadyStateChange IReadyStateChange;
 
 typedef HRESULT(*OnReadyStateComplete)(IReadyStateChange* pRSC);
@@ -158,7 +166,8 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
     // test processing can be collected by freeing the hPool member of the
     // IReadyStateChange structure, including the IReadyStateChange structure
     // itself. That is, the IReadyStateChange has a reference to the pool, but
-    // the pool still manages and frees the IReadyStateChange structure.
+    // the pool still manages and frees the memory allocated for the
+    // IReadyStateChange structure itself.
     pRSC->hPool     = hPool;
     pRSC->lpVtbl    = &IReadyStateChangeVtbl;
     pRSC->pBrowser  = pBrowser;
