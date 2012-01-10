@@ -15,22 +15,8 @@
 #include "VerityController.h"
 #include "VerityControllerFactory.h"
 
-static ULONG STDMETHODCALLTYPE
-AddRef(IClassFactory *pSelf);
-
-static ULONG STDMETHODCALLTYPE
-Release(IClassFactory *pSelf);
-
-static HRESULT STDMETHODCALLTYPE
-QueryInterface(IClassFactory *pSelf, REFIID factoryGuid, void **ppv);
 
 // The object construction and server locking parts of the interface.
-static HRESULT STDMETHODCALLTYPE
-CreateInstance(IClassFactory *pSelf, IUnknown *pUnknown,
-               REFIID guidVtbl, void **ppv);
-
-static HRESULT STDMETHODCALLTYPE
-LockServer(IClassFactory *pSelf, BOOL fLock);
 
 /* The IUnkown methods. Our singleton factory does not actually require an
  * reference counting, so we just ignore that. */
