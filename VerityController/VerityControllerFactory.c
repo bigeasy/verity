@@ -1,10 +1,22 @@
+/* A boilerplate COM object factory.
+ *
+ * The factory is a singleton. There is only ever one instance and it does not
+ * get deallocated. Thus, the COM reference counting is a no-op. For an example
+ * of COM reference in action, see the Verity controller object implementation.
+ *
+ * The factory does maintain state. It maintains our library lock count.
+ */
+
+/* System includes are in the precompiled header file. */
 #include "stdafx.h"
+
+/* Local includes. */
 #include "Log.h"
 #include "VerityController.h"
 #include "VerityControllerFactory.h"
 
-// The IUnkown methods. Our singleton factory does not actually require an
-// reference counting, so we just ignore that.
+/* The IUnkown methods. Our singleton factory does not actually require an
+ * reference counting, so we just ignore that. */
 static ULONG STDMETHODCALLTYPE
 AddRef(IClassFactory *pSelf);
 
@@ -34,27 +46,15 @@ static const IClassFactoryVtbl IVerityControllerFactoryVtbl = {
 // The singleton factory instance.
 IVerityControllerFactory factory = { &IVerityControllerFactoryVtbl, 0 };
 
-// We never create more than one instace of the factory so adjusting the count
-// always returns one.
-static ULONG STDMETHODCALLTYPE
-AddRef(IClassFactory *pSelf)
-{
-    return(1);
-}
 
-static ULONG STDMETHODCALLTYPE
-Release(IClassFactory *pSelf)
-{
-    return(1);
-}
-
-// Obtains a pointer to the factory singleton.
+/* `QueryInterface` &mdash;  Obtains a pointer to the factory singleton. */
 static HRESULT STDMETHODCALLTYPE
 QueryInterface(
     IClassFactory *pSelf, REFIID guidVtbl, void **ppv
 ) {
-    // If we do not implement the requested interface, set the result to null
-    // and retrun an error flag. 
+    /* If we do not implement the requested interface, set the result to null
+     * and retrun an error flag. 
+     */
     if (!IsEqualIID(guidVtbl, &IID_IUnknown) && 
         !IsEqualIID(guidVtbl, &IID_IClassFactory))
     {
@@ -62,9 +62,27 @@ QueryInterface(
         return E_NOINTERFACE;
     }
 
-    // Set the result to our factory singleton and indicate success.
+    /* Set the result to our factory singleton and indicate success. */
     *ppv = pSelf;
     return NOERROR;
+}
+/* `AddRef` &mdash; We never create more than one instace of the factory so
+ * adjusting the count always returns one.
+ */
+static ULONG STDMETHODCALLTYPE
+AddRef(IClassFactory *pSelf)
+{
+    return(1);
+}
+
+/* `Release` &mdash; We never create more than one instace of the factory so
+ * adjusting the count always returns one. We do not deallocate our factory, it
+ * is a static variable.
+ */
+static ULONG STDMETHODCALLTYPE
+Release(IClassFactory *pSelf)
+{
+    return(1);
 }
 
 // Create an instance of the Verity browser helper object.
