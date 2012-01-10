@@ -15,8 +15,6 @@
 #include "VerityController.h"
 #include "VerityControllerFactory.h"
 
-/* The IUnkown methods. Our singleton factory does not actually require an
- * reference counting, so we just ignore that. */
 static ULONG STDMETHODCALLTYPE
 AddRef(IClassFactory *pSelf);
 
@@ -34,17 +32,8 @@ CreateInstance(IClassFactory *pSelf, IUnknown *pUnknown,
 static HRESULT STDMETHODCALLTYPE
 LockServer(IClassFactory *pSelf, BOOL fLock);
 
-// The factory virtual function table.
-static const IClassFactoryVtbl IVerityControllerFactoryVtbl = {
-    QueryInterface,
-    AddRef,
-    Release,
-    CreateInstance,
-    LockServer
-};
-
-// The singleton factory instance.
-IVerityControllerFactory factory = { &IVerityControllerFactoryVtbl, 0 };
+/* The IUnkown methods. Our singleton factory does not actually require an
+ * reference counting, so we just ignore that. */
 
 
 /* `QueryInterface` &mdash;  Obtains a pointer to the factory singleton. */
@@ -149,3 +138,16 @@ LockServer(
     else InterlockedDecrement(&pFactory->dwLockCount);
     return NOERROR;
 }
+
+
+// The factory virtual function table.
+static const IClassFactoryVtbl IVerityControllerFactoryVtbl = {
+    QueryInterface,
+    AddRef,
+    Release,
+    CreateInstance,
+    LockServer
+};
+
+// The singleton factory instance.
+IVerityControllerFactory factory = { &IVerityControllerFactoryVtbl, 0 };
