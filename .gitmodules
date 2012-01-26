@@ -1,3 +1,9 @@
 [submodule "src"]
 	path = src
 	url = git@github.com:bigeasy/verity.git
+[submodule "code"]
+	path = code
+	url = git://github.com/bigeasy/verity.git
+[submodule "edify"]
+	path = edify
+	url = git://github.com/bigeasy/edify.git
