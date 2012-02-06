@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleExecutable</key>
+	<string>verity</string>
+	<key>CFBundleIconFile</key>
+	<string></string>
+	<key>CFBundleIdentifier</key>
+	<string>com.prettyrobots.verity</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Verity Controller</string>
+	<key>CFBundlePackageType</key>
+	<string>BRPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2012 Alan Gutierrez. All rights reserved.</string>
+	<key>WebPluginDescription</key>
+	<string>Verity Controller plug-in to launch local script server.</string>
+	<key>WebPluginMIMETypes</key>
+	<dict>
+		<key>application/x-verity-controller</key>
+		<dict>
+			<key>WebPluginTypeDescription</key>
+			<string>Verity Controller Plug-in</string>
+		</dict>
+		<key>New item</key>
+		<string></string>
+	</dict>
+	<key>WebPluginName</key>
+	<string>Verity Controller Plug-in</string>
+</dict>
+</plist>
