@@ -1,3 +1,6 @@
+/* I can't seem to find an API or other known way to store a plugin's
+ * configuration. Adobe Flash offers its configuration in a popup bar, but I
+ * don't know know where that gets stored. */
 #include "vendor/mozilla/npfunctions.h"
 
 /* Declare all of the methods provded by the browser. When the plugin is
