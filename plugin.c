@@ -1,5 +1,9 @@
 #include "vendor/mozilla/npfunctions.h"
 
+/* Declare all of the methods provded by the browser. When the plugin is
+ * initialized, we will copy the functions from the structure in the browser
+ * into these static variables. We favor a lowered-case, underbared naming
+ * convention. */
 static NPN_GetURLProcPtr npn_get_url;
 static NPN_PostURLProcPtr npn_post_url;
 static NPN_RequestReadProcPtr npn_request_read;
@@ -56,16 +60,19 @@ static NPN_HandleEventPtr npn_handle_event;
 static NPN_UnfocusInstancePtr npn_unfocus_instance;
 static NPN_URLRedirectResponsePtr npn_url_redirect_response;
 
+/* Gather the plugin library state into a structure. */
+
+/* &#9824; */
 struct plugin {
-  NPNetscapeFuncs *browser;
+  /* The file descriptor of the UNIX error log. */
   int log;
+/* &mdash; */
 };
 
+/* The one and only instance of the plugin library state. */
 static struct plugin plugin;
 
-struct verity {
-};
-
+/* Say something into the debugging log. */
 void say(const char* format, ...) {
   char buffer[4096];
   va_list args;
@@ -76,20 +83,35 @@ void say(const char* format, ...) {
   fsync(plugin.log);
 }
 
+/* Entry points for the plugin dynamic link library. Note that, the `main`
+ * function that was once necessary for Mac OS no longer applies to OS X
+ * browsers. It likes to confuse the compiler, a strange main. */
+
+/* */
 #pragma export on
+
+/* Initialize the library with the browser functions, initialize the library. */
 NPError NP_Initialize(NPNetscapeFuncs *browser);
+/* Obtain the entry point funtions for the plugin. */
 NPError NP_GetEntryPoints(NPPluginFuncs *class);
+/* Shutdown the plugin library. */
 void OSCALL NP_Shutdown();
+
+/* */
 #pragma export off
 
 NPError OSCALL NP_Initialize(NPNetscapeFuncs *browser) {
   const char *home;
   char logfile[1024];
+
+  say("NP_Initialize\n");
+
+  /* Create a log in the home directory of the current user. */
   home = getenv("HOME");
   snprintf(logfile, sizeof(logfile), "%s/verity.log", home);
-  plugin.browser = browser;
   plugin.log = open(logfile, O_WRONLY | O_APPEND | O_CREAT, 0644);
-  say("NP_Initialize\n");
+
+  /* Copy the browser NPAPI functions into our library. */
   npn_get_url = browser->geturl;
   npn_post_url = browser->posturl;
   npn_request_read = browser->requestread;
@@ -148,18 +170,19 @@ NPError OSCALL NP_Initialize(NPNetscapeFuncs *browser) {
   return NPERR_NO_ERROR;
 }
 
+/* Our plugin has a scriptable object. This is it. */
 struct verity_object {
   NPClass *class;
   uint32_t reference_count;
 };
 
-struct NPClass VerityClass;
+struct NPClass verity_class;
 
 NPObject* Verity_Allocate(NPP npp, NPClass *class) {
   struct verity_object *object;
   say("Verity_Allocate\n");
   object = (struct verity_object*) malloc(sizeof(struct verity_object));
-  object->class = &VerityClass; 
+  object->class = &verity_class; 
   object->reference_count = 1;
   return (NPObject*) object;
 }
@@ -227,7 +250,7 @@ bool Verity_Construct(NPObject *object, const NPVariant *argv, uint32_t argc,
   return false;
 }
 
-struct NPClass VerityClass = {
+struct NPClass verity_class = {
   NP_CLASS_STRUCT_VERSION, Verity_Allocate, Verity_Deallocate,
   Verity_Invalidate, Verity_HasMethod, Verity_Invoke, Verity_InvokeDefault,
   Verity_HasProperty, Verity_GetProperty, Verity_SetProperty,
@@ -291,7 +314,7 @@ NPError NP_LOADDS Verity_GetValue(NPP instance, NPPVariable variable,
     void *value) {
   switch (variable) {
     case NPPVpluginScriptableNPObject:
-      (*(NPObject**)value) = npn_create_object(instance, &VerityClass);  
+      (*(NPObject**)value) = npn_create_object(instance, &verity_class);  
     default:
       break;
   }
