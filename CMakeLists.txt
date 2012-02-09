@@ -25,7 +25,7 @@ set_target_properties(verity PROPERTIES
     XCODE_ATTRIBUTE_MACH_O_TYPE mh_bundle
     XCODE_ATTRIBUTE_INFOPLIST_FILE ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist
     MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist
-    LINK_FLAGS "-ldl -fpcc-struct-return -W1,-exported_symbols_list,\"${CMAKE_CURRENT_BINARY_DIR}/exports.txt\"")
+    LINK_FLAGS "-lcurl -fpcc-struct-return -W1,-exported_symbols_list,\"${CMAKE_CURRENT_BINARY_DIR}/exports.txt\"")
 
 if (XCODE)
 copy_resolved_item_into_bundle(${CMAKE_CURRENT_SOURCE_DIR}/vendor/cubby/build/cubby gerg/bluarg)

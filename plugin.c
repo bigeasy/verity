@@ -5,6 +5,7 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <curl/curl.h>
 #include "vendor/attendant/attendant.h"
 #include "vendor/attendant/eintr.h"
 
@@ -80,12 +81,14 @@ struct plugin {
   int log;
   /* The full path to the relay program. */
   char relay[PATH_MAX];
-  /* The full path to the cubby web server. */
+  /* The full path to the Cubby web server. */
   char cubby[PATH_MAX];
-  /* The shutdown key for the cubby server. */
+  /* The shutdown key for the Cubby web server. */
   char shutdown[256];
   /* The port of the cubby server. */
   int port;
+  /* Used to perform the GET that shuts down the Cubby web server. */
+  CURL *curl;
 /* &mdash; */
 };
 
@@ -276,6 +279,8 @@ NPError OSCALL NP_Initialize(NPNetscapeFuncs *browser) {
 
   say("cubby: %s\n", plugin.cubby);
   say("relay: %s\n", initializer.relay);
+
+  plugin.curl = curl_easy_init();
 
   return NPERR_NO_ERROR;
 }
@@ -489,6 +494,23 @@ NPError OSCALL NP_GetEntryPoints(NPPluginFuncs *class) {
 
 void OSCALL NP_Shutdown() {
   say("NP_Shutdown\n");
+  char url[4096];
+  attendant.shutdown();
+  if (plugin.curl) {
+    sprintf(url, "http://127.0.0.1:%d/cubby/shutdown?%s", plugin.port, plugin.shutdown);
+    say("Requesting shutdown: %s.\n", url);
+    curl_easy_setopt(plugin.curl, CURLOPT_URL, url);
+    curl_easy_perform(plugin.curl);
+    curl_easy_cleanup(plugin.curl);
+  }
+  if (!attendant.done(250)) {
+    say("Scram Cubby!\n");
+    attendant.scram();
+    if (!attendant.done(500)) {
+      say("Cubby still running!\n");
+    }
+  }
+  say("Shutdown.\n");
   close(plugin.log);
 }
 
