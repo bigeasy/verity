@@ -192,7 +192,6 @@ chrome.webNavigation.onCompleted.addListener((function () {
   return function (details) {
     if (details.frameId == 0) {
       CUBBY = "http://127.0.0.1:" + document.getElementById("controller").port + "/cubby";
-      alert(CUBBY);
       var xhr = new XMLHttpRequest();
       xhr.onreadystatechange = function () {
         if (xhr.readyState == 4) {
