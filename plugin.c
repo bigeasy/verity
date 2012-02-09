@@ -3,6 +3,7 @@
  * don't know know where that gets stored. */
 #include "vendor/mozilla/npfunctions.h"
 #include <dlfcn.h>
+#include <pthread.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <curl/curl.h>
@@ -89,6 +90,11 @@ struct plugin {
   int port;
   /* Used to perform the GET that shuts down the Cubby web server. */
   CURL *curl;
+  /* Gaurd process variables referenced by both the stub functions running in
+   * the plugin threads and the server process management threads. */
+  pthread_mutex_t mutex;      
+  /* Server process is running. */
+  pthread_cond_t cond;  
 /* &mdash; */
 };
 
@@ -125,6 +131,11 @@ void OSCALL NP_Shutdown();
 
 void starter(int restart) {
   char const *argv[] = { NULL };
+
+  (void) pthread_mutex_lock(&plugin.mutex);
+  plugin.port = 0;
+  (void) pthread_mutex_unlock(&plugin.mutex);
+
   attendant.start(plugin.cubby, argv);
 }
 
@@ -182,6 +193,10 @@ void connector(attendant__pipe_t in, attendant__pipe_t out) {
   newline = strchr(buffer, '\n');
   strncpy(plugin.shutdown, buffer, newline- buffer);
   plugin.port = atoi(++newline);
+
+  (void) pthread_mutex_lock(&plugin.mutex);
+  (void) pthread_cond_signal(&plugin.cond);
+  (void) pthread_mutex_unlock(&plugin.mutex);
 
   say("SHUTDOWN: %s\nPORT: %d\n", plugin.shutdown, plugin.port);
 }
@@ -256,6 +271,10 @@ NPError OSCALL NP_Initialize(NPNetscapeFuncs *browser) {
   npn_handle_event = browser->handleevent;
   npn_unfocus_instance = browser->unfocusinstance;
   npn_url_redirect_response = browser->urlredirectresponse;
+
+  /* Create our mutex and signaling device. */
+  (void) pthread_mutex_init(&plugin.mutex, NULL);
+  (void) pthread_cond_init(&plugin.cond, NULL);
 
   dladdr(NP_Initialize, &library);
   dir = library.dli_fname + strlen(library.dli_fname);
@@ -342,7 +361,12 @@ bool Verity_GetProperty(NPObject *object, NPIdentifier name, NPVariant *result) 
     exists = strcmp(string, "port") == 0;
     if (exists) {
       result->type = NPVariantType_Int32;
-      result->value.intValue = 8080;
+      (void) pthread_mutex_lock(&plugin.mutex);
+      while (plugin.port == 0) {
+        pthread_cond_wait(&plugin.cond, &plugin.mutex);
+      }
+      result->value.intValue = plugin.port;
+      (void) pthread_mutex_unlock(&plugin.mutex);
     }
     npn_mem_free(string);
   }
