@@ -1,6 +1,6 @@
-// TODO: Run only on a top script.
+// TODO Parameterize.
 const VERITY = "http://verity:8078";
-
+var CUBBY;
 
 function loadScripts(userScript, callback) {
   var scripts = [
@@ -74,27 +74,23 @@ function loadScripts(userScript, callback) {
   }
   loadScript();
 }
-const CUBBY = "http://127.0.0.1:8089/cubby";
 
-function stash(tabId, uri, sources, callback) {
+// Stash all the sources in the sources map using the key as the JavaScript file
+// name and value as the JavaScript source, then inject the source.
+function stash(uri, sources, callback) {
   var keys = Object.keys(sources);
-  var inject = function(key) {
-    var request = { uri: CUBBY + "/" + key + ".js?" + escape(uri) };
-    chrome.tabs.sendRequest(tabId, request, function () {
-      submit();
-    });
-  };
+  // XHR will convert to UTF-8 and set the correct content length. The cubby
+  // server simply needs to grab the size and the bytes and echo them back when
+  // the script element is added to the host page.
   var put = function (key, token) {
     var query = "token=" + token, xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function () {
-      if (xhr.readyState == 4) {
-        inject(key);
-      }
+      if (xhr.readyState == 4) submit();
     }
-    // http.setRequestHeader("Content-Length", sources[key].length);
-    xhr.open("POST", "http://127.0.0.1:8089/cubby/data?" + query, true);
+    xhr.open("POST", CUBBY + "/data?" + query, true);
     xhr.send(sources[key]);
   };
+
   var token = function () {
     var key = keys.shift(), query = [], xhr = new XMLHttpRequest();
     query.push("uri=" + escape(uri));
@@ -105,14 +101,15 @@ function stash(tabId, uri, sources, callback) {
         put(key, xhr.responseText);
       }
     }
-    console.log("http://127.0.0.1:8089/cubby/token?" + query);
-    xhr.open("GET", "http://127.0.0.1:8089/cubby/token?" + query, true);
+    xhr.open("GET", CUBBY + "/token?" + query, true);
     xhr.send();
   };
+
   var submit = function () {
     if (keys.length) token();
     else callback();
   };
+
   submit();
 }
 
@@ -136,36 +133,15 @@ function indent(text, padding) {
   return lines.join("\n");
 }
 
-function sendInjections(injections, uri, csrf, callback) {
-  if (injections.length) {
-    var value = injections.shift(),
-        match = /^\s*(?:'((?:[^\\']|\\.)+)'|"((?:[^\\"]|\\.)+)"|\/((?:[^\\\/]|\\.)+)\/)\s+(\S+)\s*$/.exec(value),
-        specials, target, source, data;
-    if (match) {
-      if (match[1] || match[2]) {
-        target = match[1] ? match[1] : match[2];
-        target = target.replace(/\\(.)/g, "$1");
-        specials = [
-          '/', '.', '*', '+', '?', '|',
-          '(', ')', '[', ']', '{', '}', '\\'
-        ];
-        specials = new RegExp(
-          '(\\' + specials.join('|\\') + ')', 'g'
-        );
-        target = target.replace(specials, '\\$1');
-      } else {
-        target = match[3];
-      }
-      source = match[4];
-    } else {
-      throw new Error("Bad target.");
-    }
-    data = "target=" + escape(target) + "&source=" + escape(source) + "&base=" + escape(uri);
+function sendDirectives(directives, uri, csrf, callback) {
+  if (directives.length) {
+    var directive = directives.shift();
+    var data = "directive=" + escape(directive) + "&base=" + escape(uri);
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function () {
-      if (xhr.readyState == 4) sendInjections(injections, uri, csrf, callback);
-    }
-    xhr.open("POST", VERITY + "/test/inject", true);
+      if (xhr.readyState == 4) sendDirectives(directives, uri, csrf, callback);
+    };
+    xhr.open("POST", VERITY + "/test/directive", true);
     xhr.setRequestHeader("x-csrf-token", csrf);
     xhr.setRequestHeader("content-type", "application/x-www-form-urlencoded");
     xhr.send(data);
@@ -174,34 +150,32 @@ function sendInjections(injections, uri, csrf, callback) {
   }
 }
 
-function createCompiler(tabId, uri, token, csrf) {
+function inject(tabId, name, referer, callback) {
+  var request = { uri: CUBBY + "/" + name + ".js?" + escape(referer) };
+  chrome.tabs.sendRequest(tabId, request, callback);
+};
+
+function createCompiler(tabId, uri, base, token, csrf) {
   return function (sources) {
-    var system = sources.system, expected = 0, injections = [];
+    var system = sources.system, expected = 0, directives = [];
     sources.user.forEach(function (source) {
       source.split(/\n+/).forEach(function (line) {
-        var match = /^\s*\/\/@\s+(\S*)\s+(.*)$/.exec(line);
-        if (match) {
-          var directive = match[1], value = match[2];
-          switch (directive) {
-          case "include":
-            break;
-          case "when":
-            injections.push(value);
-            break;
-          case "expect":
-            expected += parseInt(value.trim(), 10);
-            break;
-          // TODO: Send errors to server?
-          default:
-            throw new Error("Unexpected directive: " + directive);
-          }
-        }
+        var match = /^\s*(\/\/@\s+\S*\s+.*)$/.exec(line);
+        if (match) directives.push(match[1]);
       });
     });
+
     var user = indent(sources.user.join("\n\n"), 2);
     system.boilerplate = substitute(system.boilerplate, [ token, user ]);
-    sendInjections(injections, uri, csrf, function () {
-      stash(tabId, uri, system, function () {});
+
+    // We used to have more than one system script to inject, but now we have
+    // just the one. In time, if that's the way it stays, we'll come back and
+    // simplify the callbacks.
+    sendDirectives(directives, base, csrf, function () {
+      stash(uri, system, function () {
+        inject(tabId, "boilerplate", uri, function () {
+        });
+      });
     });
   }
 }
@@ -211,20 +185,22 @@ function loadTest(tabId, uri, text) {
       source = args.shift(),
       token = args.shift(),
       csrf = args.shift();
-  loadScripts(source, createCompiler(tabId, uri, token, csrf));
+  loadScripts(source, createCompiler(tabId, uri, source, token, csrf));
 }
 
 chrome.webNavigation.onCompleted.addListener((function () {
   return function (details) {
     if (details.frameId == 0) {
+      CUBBY = "http://127.0.0.1:" + document.getElementById("controller").port + "/cubby";
+      alert(CUBBY);
       var xhr = new XMLHttpRequest();
       xhr.onreadystatechange = function () {
         if (xhr.readyState == 4) {
           var text = xhr.responseText;
           if (text && text != "" && text != "NONE") loadTest(details.tabId, details.url, text);
         }
-      }
-      var query = 'url=' + escape(details.url)
+      };
+      var query = 'url=' + escape(details.url);
       xhr.open("GET", 'http://verity:8078/test/visit?' + query, true);
       xhr.send();
     }
