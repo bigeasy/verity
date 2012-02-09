@@ -3,7 +3,14 @@
  * don't know know where that gets stored. */
 #include "vendor/mozilla/npfunctions.h"
 #include <dlfcn.h>
+#include <fcntl.h>
+#include <poll.h>
 #include "vendor/attendant/attendant.h"
+#include "vendor/attendant/eintr.h"
+
+/* *Tell me now, Muses who have your homes on Olympus &mdash; for you are
+ * goddesses, and are present, and know everything, while we hear only rumor and
+ * know nothing.* &mdash; Homer */
 
 /* Declare all of the methods provded by the browser. When the plugin is
  * initialized, we will copy the functions from the structure in the browser
@@ -75,6 +82,10 @@ struct plugin {
   char relay[PATH_MAX];
   /* The full path to the cubby web server. */
   char cubby[PATH_MAX];
+  /* The shutdown key for the cubby server. */
+  char shutdown[256];
+  /* The port of the cubby server. */
+  int port;
 /* &mdash; */
 };
 
@@ -115,7 +126,61 @@ void starter(int restart) {
 }
 
 void connector(attendant__pipe_t in, attendant__pipe_t out) {
-  say("CONNECTOR!\n");
+  /* Tolerance: 1024 is not a magic number. It is a kilobyte. When I see this, I
+   * know what it means. It means that I'm reading output line by line, and no
+   * line will ever be more that 64 characters, so a kilobyte is plenty.
+   *
+   * What good does it do to give this number a name? (Again, it has a name when
+   * I read it; kilobyte.) Does it make it any easier to resolve the problem
+   * that some day in the future, a line might be more than 80 characters? If
+   * there is a bug introduced, because I've decided that, in the program we
+   * launch here, instead of emitting two lines of terse strings, I'm going to
+   * dump a megabyte of binary data, will a named number help me find the error
+   * any faster? Or will it take longer, because to change the buffer size, I
+   * have to search for the place where the name is defined? Or am I in for a
+   * penny, in for a pound, and defining these in some distant build step, a
+   * configuration file, our using a build tool?
+   *
+   * Interesting reflection on named numbers versus "magic" numbers, that it
+   * made sense to record, here.
+   */
+
+  /* */
+  char buffer[1024], *start = buffer, *newline;
+  struct pollfd fd;
+  int err, offset = 0, newlines = 0;
+
+  fd.fd = out;
+  fd.events = POLLIN;
+
+  err = fcntl(out, F_SETFL, O_NONBLOCK);
+  say("CONNECTOR! %d\n", err);
+
+  start = buffer;
+  memset(buffer, 0, sizeof(buffer));
+  while (newlines != 2) {
+    newlines = 0;
+    fd.revents = 0;
+
+    HANDLE_EINTR(poll(&fd, 1, -1), err);
+
+    err = read(out, start + offset, sizeof(buffer) - offset);
+    if (err == -1) {
+      break;
+    }
+    offset += err;
+    newline = buffer;
+    while ((newline = strchr(newline, '\n')) != NULL) {
+      newlines++;
+      newline++;
+    }
+  }
+
+  newline = strchr(buffer, '\n');
+  strncpy(plugin.shutdown, buffer, newline- buffer);
+  plugin.port = atoi(++newline);
+
+  say("SHUTDOWN: %s\nPORT: %d\n", plugin.shutdown, plugin.port);
 }
 
 NPError OSCALL NP_Initialize(NPNetscapeFuncs *browser) {
