@@ -2,6 +2,8 @@
  * configuration. Adobe Flash offers its configuration in a popup bar, but I
  * don't know know where that gets stored. */
 #include "vendor/mozilla/npfunctions.h"
+#include <dlfcn.h>
+#include "vendor/attendant/attendant.h"
 
 /* Declare all of the methods provded by the browser. When the plugin is
  * initialized, we will copy the functions from the structure in the browser
@@ -69,6 +71,10 @@ static NPN_URLRedirectResponsePtr npn_url_redirect_response;
 struct plugin {
   /* The file descriptor of the UNIX error log. */
   int log;
+  /* The full path to the relay program. */
+  char relay[PATH_MAX];
+  /* The full path to the cubby web server. */
+  char cubby[PATH_MAX];
 /* &mdash; */
 };
 
@@ -103,16 +109,28 @@ void OSCALL NP_Shutdown();
 /* */
 #pragma export off
 
+void starter(int restart) {
+  char const *argv[] = { NULL };
+  attendant.start(plugin.cubby, argv);
+}
+
+void connector(attendant__pipe_t in, attendant__pipe_t out) {
+  say("CONNECTOR!\n");
+}
+
 NPError OSCALL NP_Initialize(NPNetscapeFuncs *browser) {
   const char *home;
-  char logfile[1024];
-
-  say("NP_Initialize\n");
+  char logfile[PATH_MAX], cubby[PATH_MAX];
+  const char* dir;
+  Dl_info library;
+  struct attendant__initializer initializer;
 
   /* Create a log in the home directory of the current user. */
   home = getenv("HOME");
   snprintf(logfile, sizeof(logfile), "%s/verity.log", home);
   plugin.log = open(logfile, O_WRONLY | O_APPEND | O_CREAT, 0644);
+
+  say("NP_Initialize\n");
 
   /* Copy the browser NPAPI functions into our library. */
   npn_get_url = browser->geturl;
@@ -170,6 +188,30 @@ NPError OSCALL NP_Initialize(NPNetscapeFuncs *browser) {
   npn_handle_event = browser->handleevent;
   npn_unfocus_instance = browser->unfocusinstance;
   npn_url_redirect_response = browser->urlredirectresponse;
+
+  dladdr(NP_Initialize, &library);
+  dir = library.dli_fname + strlen(library.dli_fname);
+  while (*dir != '/') {
+    dir--;
+  }
+  strncat(plugin.cubby, library.dli_fname, dir - library.dli_fname);
+  strcat(plugin.cubby, "/cubby");
+
+  memset(&initializer, 0, sizeof(struct attendant__initializer));
+  strncat(initializer.relay, library.dli_fname, dir - library.dli_fname);
+  strcat(initializer.relay, "/relay");
+
+  initializer.starter = starter;
+  initializer.connector = connector;
+  initializer.canary = 31;
+
+  attendant.initialize(&initializer);
+
+  starter(0);
+
+  say("cubby: %s\n", plugin.cubby);
+  say("relay: %s\n", initializer.relay);
+
   return NPERR_NO_ERROR;
 }
 
@@ -223,6 +265,7 @@ bool Verity_HasProperty(NPObject *object, NPIdentifier name) {
 
 bool Verity_GetProperty(NPObject *object, NPIdentifier name, NPVariant *result) {
   bool exists = false;
+  Dl_info library;
   if (npn_identifier_is_string(name)) {
     NPUTF8* string = npn_utf8_from_indentifier(name);
     say("Verity_GetProperty: %s\n", string);
