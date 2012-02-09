@@ -42,7 +42,7 @@ message=$(curl -d "alert('a');" -s "http://localhost:8089/cubby/data?token=${tok
 message=$(curl -d "alert('a');" -s "http://localhost:8089/cubby/data?token=${token}A")
 [ "$message" == "Invalid token." ]; ok "token not found on stash"
 
-message=$(curl -e "http://foo.com/login" -s "http://localhost:8089/cubby/verity.js")
+message=$(curl -s "http://localhost:8089/cubby/verity.js?http://foo.com/login")
 [ "$message" == "alert('a');" ];    ok "get stashed data # ${message}"
 
 query="uri=http://foo.com/login"
@@ -53,7 +53,7 @@ token=$(curl -s "http://localhost:8089/cubby/token?$query")
 message=$(curl -d "alert('b');" -s "http://localhost:8089/cubby/data?token=$token")
 [ "$message" == "Stashed." ];       ok "other data stashed"
 
-message=$(curl -e "http://foo.com/login" -s "http://localhost:8089/cubby/other.js")
+message=$(curl -s "http://localhost:8089/cubby/other.js?http://foo.com/login")
 [ "$message" == "alert('b');" ];    ok "get other data # ${message}"
 
 query="uri=http://foo.com/login"
@@ -64,7 +64,7 @@ token=$(curl -s "http://localhost:8089/cubby/token?$query")
 message=$(curl -d "alert('c');" -s "http://localhost:8089/cubby/data?token=$token")
 [ "$message" == "Stashed." ];       ok "reset data stashed"
 
-message=$(curl -e "http://foo.com/login" -s "http://localhost:8089/cubby/verity.js")
+message=$(curl -s "http://localhost:8089/cubby/verity.js?http://foo.com/login")
 [ "$message" == "alert('c');" ];    ok "get reset data # ${message}"
 
 message=$(curl -s "http://localhost:8089/cubby/shutdown?"$key)

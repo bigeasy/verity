@@ -2,7 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <errno.h>
 #include "mongoose.h"
+
+ #include <unistd.h>
 
 static const char *http_header =
   "HTTP/1.1 %d OK\r\n"
@@ -10,10 +13,14 @@ static const char *http_header =
   "Content-Type: %s\r\n"
   "\r\n";
 
+// TODO We started out with more than one script injected into a test page. Now
+// we have only one page. We can return to this code and remove the name
+// parameters, since we do not have to distinguish scripts with in the host
+// page. We only need to distinguish by referer.
 struct page {
   char token[65];
   char *name;
-  char *uri;
+  char *uri; // TODO Rename referer.
   void *data;
   size_t size;
   time_t when;
@@ -190,19 +197,42 @@ static char* get_name(const char *uri)
   return name;
 }
 
+static char* get_uri(const char* uri)
+{
+  char *query_string = malloc(strlen(uri) + 3);
+  if (query_string) {
+  }
+  return query_string;
+}
+
 static void get_data(struct mg_connection *conn,
                      const struct mg_request_info *request_info)
 {
-  const char *uri   = mg_get_header(conn, "Referer");
+// The URL is the entire query string. Mongoose gives us a decode function, but
+// it only works on x-www-form-urlencoded key/value pairs, so we have to prepend
+// a key to the query string in order decode the value. When we alloc strings
+// for this, we don't bother to report out of memory here, since the caller can
+// do nothing about it. Just skip it.
+  size_t length     = strlen(request_info->query_string);
+  char *paired      = malloc(length + 3);
+  char *uri         = malloc(length * 2);
   char *name        = get_name(request_info->uri);
   const char *noop  = "(function () {})()";
-  struct page *page = find_page(uri, name);
+  struct page *page;
+  if (paired && uri && name) {
+    strcpy(paired, "u=");
+    strcat(paired, request_info->query_string);
+    mg_get_var(paired, length + 3, "u", uri, length * 2); 
+    page = find_page(uri, name);
+  }
   if (page) {
     send_javascript(conn, page->data, page->size);
   } else {
     send_javascript(conn, noop, strlen(noop));
   }
   free(name);
+  free(uri);
+  free(paired);
 }
 
 static void post_data(struct mg_connection *conn,
@@ -300,7 +330,9 @@ static void *callback(enum mg_event event,
 int main(void)
 {
   struct mg_context *ctx;
-  const char *options[] = {"num_threads", "1", "listening_ports", "8089", NULL};
+  int port = 49151, err = EADDRINUSE, count = 0;
+  char listening_port[64];
+  const char *options[] = {"listening_ports", "8089", "num_threads", "1", NULL};
   struct instance instance;
 
   srandomdev();
@@ -310,14 +342,25 @@ int main(void)
 
   instance.terminated = 0;
 
+  /* Print the shutdown secret to standard out. */
   rand_str(instance.shutdown, sizeof(instance.shutdown));
   printf("%s\n", instance.shutdown);
   fflush(stdout);
 
-  ctx = mg_start(&callback, &instance, options);
+  options[1] = listening_port;
+  while (err == EADDRINUSE) {
+    sprintf(listening_port, "%d", ++port);
+    ctx = mg_start(&callback, &instance, options);
+    err = errno;
+    errno = 0;
+    count++;
+  }
 
-  // TODO: Try a handful of port numbers until you find one free.
-  // TODO: Try in the ephemeral range.
+  /* Print the port number to standard out. */
+  printf("%d\n", port);
+  fflush(stdout);
+
+  // TODO: Build on Windows.
 
   // Wait for signal to shutdown server.
   (void) pthread_mutex_lock(&instance.mutex);
