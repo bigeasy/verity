@@ -200,7 +200,7 @@ chrome.webNavigation.onCompleted.addListener((function () {
         }
       };
       var query = 'url=' + escape(details.url);
-      xhr.open("GET", 'http://verity:8078/test/visit?' + query, true);
+      xhr.open("GET", VERITY + '/test/visit?' + query, true);
       xhr.send();
     }
   }
