@@ -75,44 +75,6 @@ function loadScripts(userScript, callback) {
   loadScript();
 }
 
-// Stash all the sources in the sources map using the key as the JavaScript file
-// name and value as the JavaScript source, then inject the source.
-function stash(uri, sources, callback) {
-  var keys = Object.keys(sources);
-  // XHR will convert to UTF-8 and set the correct content length. The cubby
-  // server simply needs to grab the size and the bytes and echo them back when
-  // the script element is added to the host page.
-  var put = function (key, token) {
-    var query = "token=" + token, xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function () {
-      if (xhr.readyState == 4) submit();
-    }
-    xhr.open("POST", CUBBY + "/data?" + query, true);
-    xhr.send(sources[key]);
-  };
-
-  var token = function () {
-    var key = keys.shift(), query = [], xhr = new XMLHttpRequest();
-    query.push("uri=" + escape(uri));
-    query.push("name=" + escape(key));
-    query = query.join("&");
-    xhr.onreadystatechange = function () {
-      if (xhr.readyState == 4) {
-        put(key, xhr.responseText);
-      }
-    }
-    xhr.open("GET", CUBBY + "/token?" + query, true);
-    xhr.send();
-  };
-
-  var submit = function () {
-    if (keys.length) token();
-    else callback();
-  };
-
-  submit();
-}
-
 function substitute(string, parameters) {
   var combined = [];
   var parts = string.split(/_X_V_X_=_X_V_X_/);
@@ -150,11 +112,6 @@ function sendDirectives(directives, uri, csrf, callback) {
   }
 }
 
-function inject(tabId, name, referer, callback) {
-  var request = { uri: CUBBY + "/" + name + ".js?" + escape(referer) };
-  chrome.tabs.sendRequest(tabId, request, callback);
-};
-
 function createCompiler(tabId, uri, base, token, csrf) {
   return function (sources) {
     var system = sources.system, expected = 0, directives = [];
@@ -172,10 +129,10 @@ function createCompiler(tabId, uri, base, token, csrf) {
     // just the one. In time, if that's the way it stays, we'll come back and
     // simplify the callbacks.
     sendDirectives(directives, base, csrf, function () {
-      stash(uri, system, function () {
-        inject(tabId, "boilerplate", uri, function () {
-        });
-      });
+      // TODO URL should be based on current location.
+      system.boilerplate += "\n\n//@ sourceUrl=http://verity.prettyrobots.com/injected.js\n"
+      source = system.boilerplate;
+      chrome.tabs.sendRequest(tabId, source, function () {});
     });
   }
 }
@@ -191,7 +148,6 @@ function loadTest(tabId, uri, text) {
 chrome.webNavigation.onCompleted.addListener((function () {
   return function (details) {
     if (details.frameId == 0) {
-      CUBBY = "http://127.0.0.1:" + document.getElementById("controller").port + "/cubby";
       var xhr = new XMLHttpRequest();
       xhr.onreadystatechange = function () {
         if (xhr.readyState == 4) {
