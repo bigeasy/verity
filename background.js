@@ -2,7 +2,7 @@
 const VERITY = "http://verity:8078";
 var CUBBY;
 
-function loadScripts(userScript, callback) {
+function loadScripts(Request, userScript, callback) {
   var scripts = [
         [ VERITY + "/test/boilerplate.js"
         , userScript
@@ -58,15 +58,13 @@ function loadScripts(userScript, callback) {
       }
       if (!seen.user[url]) {
         seen.user[url] = true;
-        var xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function () {
-          if (xhr.readyState == 4) {
-            dependencies(name, xhr.responseText);
+        new Request({
+          url: url,
+          onComplete: function (response) {
+            dependencies(name, response.text);
             loadScript();
           }
-        }
-        xhr.open("GET", url, true);
-        xhr.send();
+        }).get();
       } else {
         loadScript();
       }
@@ -95,24 +93,72 @@ function indent(text, padding) {
   return lines.join("\n");
 }
 
-function sendDirectives(directives, uri, csrf, callback) {
-  if (directives.length) {
-    var directive = directives.shift();
-    var data = "directive=" + escape(directive) + "&base=" + escape(uri);
+function XHRRequest_send(method) {
+    var options = this.options;
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function () {
       if (xhr.readyState == 4) sendDirectives(directives, uri, csrf, callback);
     };
-    xhr.open("POST", VERITY + "/test/directive", true);
-    xhr.setRequestHeader("x-csrf-token", csrf);
+    xhr.open(method, url, true);
+    var headers = options.headers;
+    for (var key in headers) {
+      if (headers.hasOwnProperty(key)) {
+        xhr.setRequestHeader(key, headers[key]);
+      }
+    }
     xhr.setRequestHeader("content-type", "application/x-www-form-urlencoded");
-    xhr.send(data);
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState == 4) {
+        options.callback({
+          text: xhr.responseText,
+          status: xhr.status,
+          statusText: xhr.statusText
+        });
+      }
+    };
+    return xhr;
+}
+
+function XHRRequest_get() {
+  XHRRequest_send("GET").send();
+}
+
+function XHRRequest_post() {
+  var options = this.options;
+  var encoded = [];
+  for (var key in options.content) {
+    if (options.hasOwnProperty(key)) {
+      encoded.push(escape(key) + "=" + escape(options[key]));
+    }
+  }
+  XHRRequest_send("POST").send(encoded.join("&"));
+}
+
+function XHRRequest(options) {
+  this.options = options;
+  this.send = XHRRequest_send;
+  this.get = XHRRequest_get;
+  this.post = XHRRequest_post;
+  return this;
+}
+
+function sendDirectives(Request, directives, uri, csrf, callback) {
+  if (directives.length) {
+    var directive = directives.shift();
+    new Request({
+      url: VERITY + "/test/directive",
+      headers: { "x-csrf-token": csrf },
+      onComplete: function () {
+        sendDirectives(Request, directives, uri, csrf, callback);
+      },
+      content: { directive: directive, base: uri }
+    }).post();
   } else {
     callback();
   }
 }
 
-function createCompiler(uri, base, token, csrf, inject) {
+function createCompiler(Request, uri, base, token, csrf, inject) {
   return function (sources) {
     var system = sources.system, expected = 0, directives = [];
     sources.user.forEach(function (source) {
@@ -128,7 +174,7 @@ function createCompiler(uri, base, token, csrf, inject) {
     // We used to have more than one system script to inject, but now we have
     // just the one. In time, if that's the way it stays, we'll come back and
     // simplify the callbacks.
-    sendDirectives(directives, base, csrf, function () {
+    sendDirectives(Request, directives, base, csrf, function () {
       // TODO URL should be based on current location.
       system.boilerplate += "\n\n//@ sourceUrl=http://verity.prettyrobots.com/injected.js\n"
       source = system.boilerplate;
@@ -137,23 +183,24 @@ function createCompiler(uri, base, token, csrf, inject) {
   }
 }
 
-function loadTest(uri, text, inject) {
+function loadTest(Request, uri, text, inject) {
   var args = text.split(/\s+/),
       source = args.shift(),
       token = args.shift(),
       csrf = args.shift();
-  loadScripts(source, createCompiler(uri, source, token, csrf, inject));
+  loadScripts(Request, source, createCompiler(Request, uri, source, token, csrf, inject));
 }
 
-function shouldTest(url, inject) {
-  var xhr = new XMLHttpRequest();
-  xhr.onreadystatechange = function () {
-    if (xhr.readyState == 4) {
-      var text = xhr.responseText;
-      if (text && text != "" && text != "NONE") loadTest(url, text, inject);
+function shouldTest(Request, url, inject) {
+  new Request({
+    url: VERITY + '/test/visit?url=' + escape(url),
+    onComplete: function (response) {
+      var text = response.text;
+      if (text && text != "" && text != "NONE") loadTest(Request, url, text, inject);
     }
-  };
-  var query = 'url=' + escape(url);
-  xhr.open("GET", VERITY + '/test/visit?' + query, true);
-  xhr.send();
+  }).get();
+}
+
+if (exports) {
+  exports.shouldTest = shouldTest;
 }
