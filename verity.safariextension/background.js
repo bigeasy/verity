@@ -1,5 +1,5 @@
 function listener (event) {
-  shouldTest(event.message, function (source) {
+  shouldTest(XHRRequest, event.message, function (source) {
     event.target.page.dispatchMessage("source", source);
   });
 }
