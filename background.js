@@ -96,10 +96,7 @@ function indent(text, padding) {
 function XHRRequest_send(method) {
     var options = this.options;
     var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function () {
-      if (xhr.readyState == 4) sendDirectives(directives, uri, csrf, callback);
-    };
-    xhr.open(method, url, true);
+    xhr.open(method, options.url, true);
     var headers = options.headers;
     for (var key in headers) {
       if (headers.hasOwnProperty(key)) {
@@ -109,7 +106,7 @@ function XHRRequest_send(method) {
     xhr.setRequestHeader("content-type", "application/x-www-form-urlencoded");
     xhr.onreadystatechange = function () {
       if (xhr.readyState == 4) {
-        options.callback({
+        options.onComplete({
           text: xhr.responseText,
           status: xhr.status,
           statusText: xhr.statusText
@@ -120,18 +117,18 @@ function XHRRequest_send(method) {
 }
 
 function XHRRequest_get() {
-  XHRRequest_send("GET").send();
+  this.send("GET").send();
 }
 
 function XHRRequest_post() {
-  var options = this.options;
+  var content = this.options.content;
   var encoded = [];
-  for (var key in options.content) {
-    if (options.hasOwnProperty(key)) {
-      encoded.push(escape(key) + "=" + escape(options[key]));
+  for (var key in content) {
+    if (content.hasOwnProperty(key)) {
+      encoded.push(escape(key) + "=" + escape(content[key]));
     }
   }
-  XHRRequest_send("POST").send(encoded.join("&"));
+  this.send("POST").send(encoded.join("&"));
 }
 
 function XHRRequest(options) {
@@ -201,6 +198,6 @@ function shouldTest(Request, url, inject) {
   }).get();
 }
 
-if (exports) {
+if (typeof exports != "undefined") {
   exports.shouldTest = shouldTest;
 }
