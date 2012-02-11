@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+           id="http://veirty.prettyrobots.com/">
+  <name>Verity Controller</name>
+  <description>Verity Controller for Opera.</description>
+  <author href="https://verity.prettyrobots.com/"
+          email="alan@prettyrobots.com">Alan Gutierrez</author>
+  <access origin="*"/>
+</widget>
