@@ -20,11 +20,16 @@
 	<dict>
 		<key>Global Page</key>
 		<string>background.html</string>
-    </dict>
+	</dict>
 	<key>Content</key>
 	<dict>
 		<key>Scripts</key>
-		<dict/>
+		<dict>
+			<key>Start</key>
+			<array>
+				<string>content.js</string>
+			</array>
+		</dict>
 	</dict>
 	<key>Description</key>
 	<string>Verity Controller for Safari</string>
