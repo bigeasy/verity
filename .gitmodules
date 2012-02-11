@@ -1,0 +1,3 @@
+[submodule "lib/extension"]
+	path = lib/extension
+	url = git://github.com/bigeasy/verity.git
