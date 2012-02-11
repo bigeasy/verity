@@ -112,7 +112,7 @@ function sendDirectives(directives, uri, csrf, callback) {
   }
 }
 
-function createCompiler(tabId, uri, base, token, csrf) {
+function createCompiler(uri, base, token, csrf, inject) {
   return function (sources) {
     var system = sources.system, expected = 0, directives = [];
     sources.user.forEach(function (source) {
@@ -132,32 +132,28 @@ function createCompiler(tabId, uri, base, token, csrf) {
       // TODO URL should be based on current location.
       system.boilerplate += "\n\n//@ sourceUrl=http://verity.prettyrobots.com/injected.js\n"
       source = system.boilerplate;
-      chrome.tabs.sendRequest(tabId, source, function () {});
+      inject(system.boilerplate);
     });
   }
 }
 
-function loadTest(tabId, uri, text) {
+function loadTest(uri, text, inject) {
   var args = text.split(/\s+/),
       source = args.shift(),
       token = args.shift(),
       csrf = args.shift();
-  loadScripts(source, createCompiler(tabId, uri, source, token, csrf));
+  loadScripts(source, createCompiler(uri, source, token, csrf, inject));
 }
 
-chrome.webNavigation.onCompleted.addListener((function () {
-  return function (details) {
-    if (details.frameId == 0) {
-      var xhr = new XMLHttpRequest();
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState == 4) {
-          var text = xhr.responseText;
-          if (text && text != "" && text != "NONE") loadTest(details.tabId, details.url, text);
-        }
-      };
-      var query = 'url=' + escape(details.url);
-      xhr.open("GET", VERITY + '/test/visit?' + query, true);
-      xhr.send();
+function shouldTest(url, inject) {
+  var xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState == 4) {
+      var text = xhr.responseText;
+      if (text && text != "" && text != "NONE") loadTest(url, text, inject);
     }
-  }
-})());
+  };
+  var query = 'url=' + escape(url);
+  xhr.open("GET", VERITY + '/test/visit?' + query, true);
+  xhr.send();
+}
