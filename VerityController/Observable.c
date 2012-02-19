@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "Observable.h"
 #include "ComponentObjectModel.h"
 #include "GenericFactory.h"
 
