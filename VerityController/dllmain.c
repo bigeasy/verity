@@ -36,7 +36,9 @@ WriteWideCharacterToLog(const TCHAR* pwsz)
     WriteFile((HANDLE) hfLog, psz, strlen(psz), &dwWritten, NULL);
 }
 
-// Format a logging message and write it to the log file.
+// Format a logging message and write it to the log file. Always remember to use
+// a cousin of `vsprintf`, not `sprintf` itself. Read a man page. We use
+// convoluted wide character flavored `vsprintf` here.
 void
 Log(const TCHAR* format, ...)
 {
