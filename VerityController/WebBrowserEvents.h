@@ -4,3 +4,4 @@ typedef struct CWebBrowserEvents {
 } IWebBrowserEvents;
 
 IWebBrowserEvents WebBrowserEvents;
+IActiveScriptSite ActiveScriptSite;

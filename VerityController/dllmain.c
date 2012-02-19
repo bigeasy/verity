@@ -1,6 +1,12 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "stdafx.h"
-#include "VerityControllerFactory.h"
+#include "dllmain.h"
+
+HRESULT ObjectWithSite_CreateFactory();
+HRESULT ScriptContext_CreateFactory();
+HRESULT ActiveScriptSite_CreateFactory();
+HRESULT OnDocument_CreateFactory();
+HRESULT Observable_CreateFactory();
 
 // Functions for logging. The debugger is difficult with Internet Explorer. It
 // runs slowly and appears to cause a lot of problems for IE. We've got a 
@@ -59,6 +65,8 @@ OpenLog()
 #define Log(format, ...) void(0)
 #endif
 
+HMODULE hDllModule = 0;
+
 // Library entry point. When you register a browser helper object, it will be
 // looaded by both IE and Windows Explorer. We want nothing to do with Windows
 // Explorer, so we refuse to load when it calls us.
@@ -75,9 +83,17 @@ BOOL APIENTRY DllMain(
         GetModuleFileName(NULL, pszLoader, MAX_PATH);
         Log(_T("Process Attaching: %s\n"), pszLoader);
         _tcslwr_s(pszLoader, MAX_PATH);
-        if (_tcsstr(pszLoader, _T("explorer.exe"))) {
+        if (_tcsstr(pszLoader, _T("explorer.exe")))
+        {
             return FALSE;
         }
+        ActiveScriptSite_CreateFactory();
+        OnDocument_CreateFactory();
+        ObjectWithSite_CreateFactory();
+        ScriptContext_CreateFactory();
+        Observable_CreateFactory();
+        Log(L"Here I Am!\n");
+        hDllModule = hModule;
         break;
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
@@ -96,7 +112,7 @@ CreateKey(HKEY hKey, LPTSTR lpzPath, HKEY* hkResult)
 {
     DWORD dwDisposition;
     return RegCreateKeyEx(hKey, lpzPath, 0, NULL, REG_OPTION_NON_VOLATILE,
-                         KEY_WRITE, NULL, hkResult, &dwDisposition);
+        KEY_WRITE, NULL, hkResult, &dwDisposition) == ERROR_SUCCESS;
 }
 
 // DRY up the setting of a Windows Registry value.
@@ -105,7 +121,31 @@ SetString(HKEY hKey, LPTSTR lpzPath, LPTSTR lpzValue)
 {
     return RegSetValueEx(hKey, lpzPath, 0, REG_SZ,
                          (CONST BYTE *) lpzValue,
-                         lstrlen(lpzValue) * sizeof(TCHAR));
+                         lstrlen(lpzValue) * sizeof(TCHAR)) == ERROR_SUCCESS;
+}
+
+#define CLSID_VERITY _T("{0308456E-B8AA-4267-9A3E-09010E0A6754}")
+
+HRESULT __stdcall AddClass(LPTSTR lpzClassKey, LPTSTR lpzControlName, LPTSTR lpzLibrary)
+{
+    HKEY hkClass = NULL, hkInproc;
+    HRESULT hr;
+    if (!(hr = CreateKey(HKEY_CLASSES_ROOT, lpzClassKey, &hkClass))) goto exit;
+    if (!(hr = SetString(hkClass, NULL, lpzControlName))) goto exit;
+    if (!(hr = CreateKey(hkClass, _T("InprocServer32"), &hkInproc))) goto exit;
+    if (!(hr = SetString(hkInproc, NULL, lpzLibrary))) goto exit;
+    if (!(hr = SetString(hkInproc, _T("TreadingModel"), _T("Apartment")))) goto exit;
+    hr = S_OK;
+exit:
+    if (hkClass)
+    {
+        RegCloseKey(hkClass);
+    }
+    if (hkInproc)
+    {
+        RegCloseKey(hkInproc);
+    }
+    return hr;
 }
 
 // Register this browser helper object. This method is invoked by regsrv32.exe
@@ -113,30 +153,52 @@ SetString(HKEY hKey, LPTSTR lpzPath, LPTSTR lpzValue)
 // Explorer that we are a Browser Helper Object server.
 HRESULT __stdcall DllRegisterServer(void)
 {
-    HKEY hkClass, hkInproc, hkBHO, hkVerity;
-    long lRet;
-    LPTSTR lpzControlName = _T("Verity Controller"); 
-    LPTSTR lpzLibrary     = _T("c:\\codearea\\git\\VerityController\\")
-                            _T("Debug\\VerityController.dll");
-    LPTSTR lpzClassKey    = _T("CLSID\\") CLSID_VERITY;
-    LPTSTR lpzBHOKey      = _T("Software\\Microsoft\\Windows\\CurrentVersion\\")
-                            _T("Explorer\\Browser Helper Objects");
-    lRet = CreateKey(HKEY_CLASSES_ROOT, lpzClassKey, &hkClass);
-    if (lRet != ERROR_SUCCESS) return SELFREG_E_CLASS;
-    lRet = SetString(hkClass, NULL, lpzControlName);
-    if (lRet != ERROR_SUCCESS) return SELFREG_E_CLASS;
-    lRet = CreateKey(hkClass, _T("InprocServer32"), &hkInproc);
-    if (lRet != ERROR_SUCCESS) return SELFREG_E_CLASS;
-    lRet = SetString(hkInproc, NULL, lpzLibrary);
-    if (lRet != ERROR_SUCCESS) return SELFREG_E_CLASS;
-    lRet = SetString(hkInproc, _T("TreadingModel"), _T("Apartment"));
-    if (lRet != ERROR_SUCCESS) return SELFREG_E_CLASS;
-    lRet = CreateKey(HKEY_LOCAL_MACHINE, lpzBHOKey, &hkBHO);
-    if (lRet != ERROR_SUCCESS) return SELFREG_E_CLASS;
-    lRet = CreateKey(hkBHO, CLSID_VERITY, &hkVerity);
-    if (lRet != ERROR_SUCCESS) return SELFREG_E_CLASS;
-    lRet = SetString(hkVerity, NULL, lpzControlName);
-    return S_OK;
+    HKEY hkBHO = NULL, hkVerity = NULL;
+    LPTYPELIB pTypeLib = NULL;
+    HRESULT hr;
+    LPTSTR lpzControlName   = _T("Verity Controller"); 
+    LPTSTR lpzLibrary       = _T("c:\\codearea\\git\\VerityController\\")
+                              _T("Debug\\VerityController.dll");
+    LPTSTR lpzTypeLib       = _T("c:\\codearea\\git\\VerityController\\VerityController\\")
+                              _T("Debug\\VerityController.tlb");
+    LPTSTR lpzClassKey      = _T("CLSID\\") CLSID_VERITY;
+    LPTSTR lpzContextKey    = _T("CLSID\\{7CD57D42-C553-4B82-A52A-513082F57EE0}");
+    LPTSTR lpzOnDocumentKey = _T("CLSID\\{42939237-42F0-4E3F-818E-FA63E4EB5A82}");
+    LPTSTR lpzBHOKey        = _T("Software\\Microsoft\\Windows\\CurrentVersion\\")
+                              _T("Explorer\\Browser Helper Objects");
+
+    if (!(hr = AddClass(L"CLSID\\{73C6AB50-2BEE-4DC0-AB1C-910C255D1C23}", L"Verity ActiveScriptSite", lpzLibrary)))
+    {
+        goto exit;
+    }
+    if (!(hr = AddClass(L"CLSID\\{42939237-42F0-4E3F-818E-FA63E4EB5A82}", L"Verity OnDocument Handler", lpzLibrary)))
+    {
+        goto exit;
+    }
+
+    if (!(hr = AddClass(L"CLSID\\{7CD57D42-C553-4B82-A52A-513082F57EE0}", L"Verity Script Context", lpzLibrary)))
+    {
+        goto exit;
+    }
+
+    if (!(hr = AddClass(L"CLSID\\" CLSID_VERITY, L"Verity Controller", lpzLibrary)))
+    {
+     //   goto exit;
+    }
+
+    if (!(hr = CreateKey(HKEY_LOCAL_MACHINE, lpzBHOKey, &hkBHO))) goto exit;
+    if (!(hr = CreateKey(hkBHO, CLSID_VERITY, &hkVerity))) goto exit;
+    if (!(hr = SetString(hkVerity, NULL, lpzControlName))) goto exit;
+
+    if (LoadTypeLib(lpzTypeLib, &pTypeLib) != S_OK) goto exit;
+    if (RegisterTypeLib(pTypeLib, lpzTypeLib, NULL) != ERROR_SUCCESS) goto exit;
+    hr = S_OK;
+exit:
+    if (pTypeLib)
+    {
+        pTypeLib->lpVtbl->Release(pTypeLib);
+    }
+    return hr;
 }
 
 // TODO: Remove Browser Helper Object Windows Registry keys and the COM object
@@ -146,24 +208,72 @@ HRESULT __stdcall DllUnregisterServer(void)
     return S_OK;
 }
 
+static int dwFactoryCount = 0;
+typedef struct factory {
+    const GUID *clsid;
+    IClassFactory *pFactory;
+    DWORD dwLockCount;
+} IFactoryMapping;
+static IFactoryMapping afmRegisteredFactories[5];
+
+DWORD*
+RegisterObjectFactory(const GUID *clsid, IClassFactory *pFactory)
+{
+    IFactoryMapping *fm;
+    Log(L"Factory registered! %d\n", dwFactoryCount);
+    fm = &afmRegisteredFactories[dwFactoryCount++];
+    fm->clsid = clsid;
+    fm->pFactory = pFactory;
+    return &fm->dwLockCount;
+}
+
+HRESULT
+GenericFactory_GetFactory(REFCLSID guidObject, REFIID guidFactory, LPVOID *ppvFactory)
+{
+    IClassFactory *pFactory;
+    int i;
+    for (i = 0; i < dwFactoryCount; i++)
+    {
+        Log(L"What is library %d?\n", i);
+        if (IsEqualCLSID(guidObject, afmRegisteredFactories[i].clsid))
+        {
+            pFactory = afmRegisteredFactories[i].pFactory;
+            Log(L"It's a hit! %d\n", pFactory == NULL);
+            return pFactory->lpVtbl->
+                QueryInterface(pFactory, guidFactory, ppvFactory);
+        }
+    }
+
+    *ppvFactory = 0;
+    return CLASS_E_CLASSNOTAVAILABLE;
+}
 // If we're asked for Verity browser helper object, oblige by returning the
 // factory that makes them. Otherwise, set the factory result to NULL and flag
 // an error.
 HRESULT __stdcall
 DllGetClassObject(REFCLSID guidObject, REFIID guidFactory, LPVOID *ppvFactory)
 {
-    HRESULT  hr;
-    if (IsEqualCLSID(guidObject, &CLSID_IVerityController))
-    {
-        hr = factory.lpVtbl->QueryInterface(
-                (IClassFactory *) &factory, guidFactory, ppvFactory);
-    }
-    else
-    {
-        *ppvFactory = 0;
-        hr = CLASS_E_CLASSNOTAVAILABLE;
-    }
+    return GenericFactory_GetFactory(guidObject, guidFactory, ppvFactory);
+}
 
+HRESULT
+GenericFactory_CreateInstance(LPCTSTR clsid, REFIID riid, LPVOID *pObject)
+{
+    HRESULT hr;
+    IClassFactory *pClassFactory;
+    GUID guid;
+    hr = CLSIDFromString(clsid, &guid);
+    if (hr != S_OK)
+    {
+        return hr;
+    }
+    hr = GenericFactory_GetFactory(&guid, &IID_IClassFactory, (LPVOID*) &pClassFactory);
+    if (hr != S_OK)
+    {
+        return hr;
+    }
+    hr = pClassFactory->lpVtbl->CreateInstance(pClassFactory, NULL, riid, pObject);
+    pClassFactory->lpVtbl->Release(pClassFactory);
     return hr;
 }
 
@@ -171,7 +281,14 @@ DllGetClassObject(REFCLSID guidObject, REFIID guidFactory, LPVOID *ppvFactory)
 // locks on the library.
 HRESULT __stdcall DllCanUnloadNow(void)
 {
-    HRESULT err = factory.dwLockCount ? S_FALSE : S_OK;
+    int i;
     Log(_T("Asking about unloading: %d\n"), S_OK);
-    return err;
+    for (i = 0; i < dwFactoryCount; i++)
+    {
+        if (afmRegisteredFactories[i].dwLockCount)
+        {
+            return S_FALSE;
+        }
+    }
+    return S_OK;
 }

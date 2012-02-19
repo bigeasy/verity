@@ -12,7 +12,7 @@ LISTNODE*   PoolAllocNode           (HANDLE hList);
 BSTR        PoolAllocStringBytes    (HANDLE hListPool, UINT uiBytes);
 BSTR        PoolAllocString         (HANDLE hListPool, TCHAR* tstr);
 HRESULT     PoolQueryInterface      (HANDLE hPool, LPVOID pSelf, REFIID guidVtbl, LPVOID* ppv);
-HRESULT     PoolCoCreateInstance    (REFCLSID rclsid, REFIID riid, LPVOID* ppv);
+HRESULT     PoolCoCreateInstance    (HANDLE hPool, REFCLSID rclsid, REFIID riid, LPVOID* ppv);
 
 BSTR        PoolAppendString        (HANDLE hListPool, BSTR string, BSTR append);
 LPVOID      PoolAllocMemory         (HANDLE hListPool, SIZE_T sSize);

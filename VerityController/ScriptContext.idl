@@ -1,0 +1,24 @@
+[uuid(9753946F-58D1-46DC-BAB1-321C00ABD037), version(1.0),
+    helpstring("Script context object library for Verity Controller.")]
+library IScriptContext
+{
+    importlib("STDOLE2.TLB");
+
+    [uuid(06ADED5A-6532-4112-96EC-22FD8BA69BCF), dual, oleautomation, hidden, nonextensible]
+    interface IScriptContextVtbl: IDispatch
+    {
+        [helpstring("Sets a string into a cubbyhole.")] 
+        [id(1)] HRESULT SetString([in] BSTR bstr);
+        [helpstring("Gets a string from a cubbyhole.")] 
+        [id(2)] HRESULT GetString([out, retval] BSTR *pbstr);
+        [id(3)] HRESULT createXHR([out, retval] IDispatch **ppDispatch);
+        [id(4)] HRESULT createObservable([out, retval] IDispatch **pDispatch);
+    }
+
+    [uuid(7CD57D42-C553-4B82-A52A-513082F57EE0),
+        helpstring("Script context object for Verity Controller."), appobject]
+    coclass IScriptContext
+    {
+        [default] interface IScriptContextVtbl;
+    }
+}

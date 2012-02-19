@@ -23,6 +23,22 @@
 #include "Jumps.h"
 #include "VerityController.h"
 #include "WebBrowserEvents.h"
+#include "ComponentObjectModel.h"
+#include "GenericFactory.h"
+
+static DWORD *pdwLockCount;
+
+#pragma once
+// The Verity browser helper object data.
+typedef struct ObjectWithSite
+{
+    const IObjectWithSiteVtbl* lpVtbl;
+    DWORD               dwCount;
+    IConnectionPoint*   pSiteConnectionPoint;
+    DWORD               dwSiteAdviseCookie;
+    IUnknown*           pSite;
+}
+ObjectWithSite;
 
 // Class GUID for the Verity controller Browser Helper Object. 
 
@@ -47,57 +63,15 @@ const GUID CLSID_IVerityController =
  *
  */
 
-/* We respond implement `IUnknown` and `IObjectWithSite`. */
-static HRESULT STDMETHODCALLTYPE
-QueryInterface(IObjectWithSite *pSelf, REFIID guidVtbl, void **ppv)
+static REFIID ariidImplemented[] =
 {
-    /* Check that we're being asked for the one of the two interaces we provide.
-     * If not, clear the result pointer and send an error flag.
-     */
-    if (!IsEqualIID(guidVtbl, &IID_IUnknown) && 
-        !IsEqualIID(guidVtbl, &IID_IObjectWithSite))
-    {
-        *ppv = 0;
-        return E_NOINTERFACE;
-    }
+    &IID_IUnknown,
+    &IID_IObjectWithSite,
+    NULL
+};
 
-    /* Return the `IObjectWithSite` interface, which is the only interface we
-     * support, so we can return the object passed in. Set the result to self,
-     * increment the refernece count and flag success.
-     */
-    *ppv = pSelf;
-    pSelf->lpVtbl->AddRef(pSelf);
-    return NOERROR;
-}
-
-/* `AddRef` &mdash; More boilerplate COM. Increment the reference count and
- * return the updated count.
- */
-static ULONG STDMETHODCALLTYPE
-AddRef(IObjectWithSite *pSelf)
-{
-    IVerityController* pVerity = (IVerityController*) pSelf;
-    ++pVerity->dwCount;
-    return (pVerity->dwCount);
-}
-
-/* `Release` &mdash; Move boilerplate COM. Decrement the reference count and
- * return the updated count. If the count reaches zero, we free the object.
- */
-static ULONG STDMETHODCALLTYPE
-Release(IObjectWithSite *pSelf)
-{
-    IVerityController* pVerity = (IVerityController*) pSelf;
-    --pVerity->dwCount;
-    if (pVerity->dwCount == 0)
-    {
-        Log(_T("Deleting.\n"));
-        InterlockedIncrement(pVerity->pdwLockCount);
-        GlobalFree(pSelf);
-        return(0);
-    }
-    return (pVerity->dwCount);
-}
+QUERY_INTERFACE(IObjectWithSite, ariidImplemented)
+REFERENCE_COUNT(IObjectWithSite, ObjectWithSite, pdwLockCount, NO_DESTRUCTOR)
 
 /* We want to know when a page loads so we can check to see if we have a test we
  * want to run against the page. This function installs an event handler for
@@ -106,18 +80,19 @@ Release(IObjectWithSite *pSelf)
 
 /* */
 static HRESULT
-HookSite(IVerityController* pVerity)
+HookSite(ObjectWithSite* pVerity)
 {
     HRESULT err;
     IUnknown* pSite = pVerity->pSite;
     IConnectionPointContainer* pCPC;
     IConnectionPoint* pCP;
+
     /* Get the connection point collection. Ask for the web browser connection
      * point. Register a callback. The callback will be called for dozens of
      * different types of web browser events, but we're only interested in the
-     * document load event. We can't make that distinction here, though, we make
-     * it in our callback. We have to get all the events, ignoring all but the
-     * documetn load event.
+     * document load event. We can't make that distinction here, though, we
+     * make it in our callback. We have to get all the events, ignoring all but
+     * the document load event.
      */
 
     /* Obtain the [connection points
@@ -159,7 +134,7 @@ exit:
  * browser event handlers from the previous site that was set.
  */
 static void
-UnhookSite(IVerityController* pVerity)
+UnhookSite(ObjectWithSite* pVerity)
 {
     IUnknown* pSite = pVerity->pSite;
     IConnectionPoint* pCP = pVerity->pSiteConnectionPoint;
@@ -178,10 +153,10 @@ UnhookSite(IVerityController* pVerity)
 
 /* */
 static HRESULT STDMETHODCALLTYPE
-SetSite(IObjectWithSite *pSelf, IUnknown *pUnknown)
+IObjectWithSite_SetSite(IObjectWithSite *pSelf, IUnknown *pUnknown)
 {
     HRESULT err = S_OK;
-    IVerityController* pVerity = (IVerityController*) pSelf;
+    ObjectWithSite* pVerity = (ObjectWithSite*) pSelf;
     /* Unset the prevoius web browser object if any. Remove the document oad
      * event handler. */
     if (pVerity->pSite)
@@ -203,10 +178,10 @@ SetSite(IObjectWithSite *pSelf, IUnknown *pUnknown)
  * object is in its window, but it does.
  */
 static HRESULT STDMETHODCALLTYPE
-GetSite(IObjectWithSite *pSelf, REFIID riid, void **ppvSite)
+IObjectWithSite_GetSite(IObjectWithSite *pSelf, REFIID riid, void **ppvSite)
 {
     HRESULT err = S_FALSE;
-    IVerityController* pVerity = (IVerityController*) pSelf;
+    ObjectWithSite* pVerity = (ObjectWithSite*) pSelf;
     IUnknown* pSite = pVerity->pSite;
     if (pSite)
     {
@@ -221,11 +196,59 @@ GetSite(IObjectWithSite *pSelf, REFIID riid, void **ppvSite)
  * Gather up the above functions into a virtual table structure and you have a
  * COM class.
  */
-const IObjectWithSiteVtbl IVerityControllerVtbl =
+const IObjectWithSiteVtbl ObjectWithSiteVtbl =
 {
-    QueryInterface,
-    AddRef,
-    Release,
-    SetSite,
-    GetSite
+    IObjectWithSite_QueryInterface,
+    IObjectWithSite_AddRef,
+    IObjectWithSite_Release,
+    IObjectWithSite_SetSite,
+    IObjectWithSite_GetSite
 };
+
+// Create an instance of the Verity browser helper object.
+static HRESULT
+ObjectWithSite_CreateInstance(
+    REFIID guidVtbl, void **ppv
+) {
+    HRESULT              hr;
+    ObjectWithSite   *pVerity;
+
+    // Allocate the memory for the Verity browser helper object.
+    if (!(pVerity = GlobalAlloc(GMEM_FIXED, sizeof(ObjectWithSite))))
+    {
+        hr = E_OUTOFMEMORY;
+    }
+    else
+    {
+        // Set the virtual function table and reference count.
+        pVerity->lpVtbl = &ObjectWithSiteVtbl;
+        pVerity->dwCount = 1;
+        pVerity->pSite = NULL;
+        pVerity->pSiteConnectionPoint = NULL;
+
+        // Increment the library lock count.
+        InterlockedIncrement(pdwLockCount);
+
+        // Now use QueryInterface to set the caller's result pointer.
+        // QueryInterface will also check that request interface is the
+        // one supported by our Verity browser helper object.
+        hr = ObjectWithSiteVtbl.QueryInterface(
+                (IObjectWithSite*) pVerity, guidVtbl, ppv);
+
+        // If we had a problem above, then the reference count is still
+        // one, so decrementing it will free the memory we just allocated,
+        // otherwise, it is two and decrementing it makes it as it should
+        // be.
+        ObjectWithSiteVtbl.Release((IObjectWithSite*) pVerity);
+    }
+
+    Log(_T("Allocated: %d\n"), hr);
+    return hr;
+}
+
+HRESULT
+ObjectWithSite_CreateFactory()
+{
+    return GenericFactory_CreateFactory(&CLSID_IVerityController,
+            ObjectWithSite_CreateInstance, &pdwLockCount);
+}

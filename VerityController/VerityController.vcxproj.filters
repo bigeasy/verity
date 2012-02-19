@@ -32,9 +32,6 @@
     <ClCompile Include="VerityController.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VerityControllerFactory.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="stdafx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -44,5 +41,30 @@
     <ClCompile Include="Pool.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ActiveScriptSite.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ScriptContext.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GenericFactory.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ComponentObjectModel.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Observable.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="ScriptContext.idl">
+      <Filter>Source Files</Filter>
+    </Midl>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="VerityController.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

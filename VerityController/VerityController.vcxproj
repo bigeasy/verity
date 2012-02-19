@@ -80,6 +80,8 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ActiveScriptSite.c" />
+    <ClCompile Include="ComponentObjectModel.c" />
     <ClCompile Include="dllmain.c">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -88,14 +90,22 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
       </PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="GenericFactory.c" />
+    <ClCompile Include="Observable.c" />
     <ClCompile Include="Pool.c" />
+    <ClCompile Include="ScriptContext.c" />
     <ClCompile Include="stdafx.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="VerityController.c" />
-    <ClCompile Include="VerityControllerFactory.c" />
     <ClCompile Include="WebBrowserEvents.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="ScriptContext.idl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="VerityController.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
