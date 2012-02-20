@@ -1,9 +1,9 @@
-VERITY CHROMIUM
+VERITY COMMON EXTENSION
 
-A Google Chrome extension implementation of the Verity client controller.
+This is the JavaScript common to all Verity browser extensions.
 
     Home:           http://bigeasy.github.com/verity
-    Source:         http://github.com/bigeasy/verity/tree/chromium
+    Source:         http://github.com/bigeasy/verity/tree/extension
     Documentation:  http://github.com/bigeasy/verity/wiki
 
     Issues:         http://github.com/bigeasy/verity/issues
@@ -12,4 +12,4 @@ A Google Chrome extension implementation of the Verity client controller.
 
 PURPOSE
 
-Used to control a Verity Grid client browser in Google Chrome.
+Used to control a Verity Grid client browser.
