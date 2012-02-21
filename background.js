@@ -16,7 +16,7 @@ opera.extension.onmessage = function (event) {
       , source: "http://dossier:8048/verity/user/landing/index.js"
       }
     ]),
-    createRequest: createXHRRequest,
+    createRequest: createXHRRequest(function () { return new XMLHttpRequest() }),
     injector: function (source) {
       if (source) {
         event.source.postMessage(source);
