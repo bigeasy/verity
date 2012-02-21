@@ -79,7 +79,7 @@ function indent(text, padding) {
 
 function XHRRequest_send(method) {
     var options = this.options;
-    var xhr = new XMLHttpRequest();
+    var xhr = this.createXHR();
     xhr.open(method, options.url, true);
     var headers = options.headers;
     for (var key in headers) {
@@ -115,16 +115,19 @@ function XHRRequest_post() {
   this.send("POST").send(encoded.join("&"));
 }
 
-function XHRRequest(options) {
+function XHRRequest(options, createXHR) {
   this.options = options;
+  this.createXHR = createXHR;
   this.send = XHRRequest_send;
   this.get = XHRRequest_get;
   this.post = XHRRequest_post;
   return this;
 }
 
-function createXHRRequest(options) {
-  return new XHRRequest(options);
+function createXHRRequest(createXHR) {
+  return function (options) {
+    return new XHRRequest(options, createXHR);
+  }
 }
 
 // Via: [Yaffle](https://gist.github.com/1088850)
