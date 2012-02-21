@@ -2,75 +2,59 @@
 const VERITY = "http://verity:8078";
 var CUBBY;
 
-function loadScripts(Request, userScript, callback) {
-  var scripts = [
-        [ VERITY + "/test/boilerplate.js"
-        , userScript
-        ]
-      ],
-      seen    = { system: {}, user: {} },
-      loaded  = { system: {}, user: [] };
+function createLoader(options, source, compiler) {
+  return function (token) {
+    var scripts = [ [ source ] ], seen = {}, loaded = []; 
 
-  function dependencies(name, source) {
-    var dependency, dependencies = [], lines = source.split(/\n/);
-    for (var i = 0, stop = lines.length; i < stop; i++) {
-      if ( /^\s*$/.test( lines[i] ) ) continue;
-      var match = /^\s*\/\/(?:\s+@require\s+(\S+))/.exec(lines[i]);
-      if (! match) break;
-      if (dependency = match[1]) {
-        dependencies.push(dependency);
+    function dependencies(source) {
+      var dependency, dependencies = [], lines = source.split(/\n/);
+      for (var i = 0, stop = lines.length; i < stop; i++) {
+        if ( /^\s*$/.test( lines[i] ) ) continue;
+        var match = /^\s*\/\/(?:\s+@require\s+(\S+))/.exec(lines[i]);
+        if (! match) break;
+        if (dependency = match[1]) {
+          dependencies.push(dependency);
+        }
       }
-    }
-    if (dependencies.length) {
-      scripts.unshift(source);
-      scripts.unshift(dependencies);
-    } else if (name) {
-      loaded.system[name] = source
-    } else {
-      loaded.user.push(source);
-    }
-  }
-
-  var isSystem = new RegExp("^" + VERITY + "/test/(boilerplate)\\.js$");
-  function loadScript() {
-    var match, name;
-    if (scripts[0].length == 0) {
-      scripts.shift()
-      if (scripts[0]) {
-        loaded.user.push(scripts.shift());
-      }
-      if (scripts[0]) {
-        loadScript();
+      if (dependencies.length) {
+        scripts.unshift(source);
+        scripts.unshift(dependencies);
       } else {
-        callback(loaded);
+        loaded.push(source);
       }
-    } else {
-      var url = scripts[0].shift();
-      if (match = isSystem.exec(url)) { 
-        name = match[1]
-        if (!seen.system[name]) {
-          seen.system[url] = true;
+    }
+
+    function loadScript() {
+      var match, name;
+      if (scripts[0].length == 0) {
+        scripts.shift()
+        if (scripts[0]) {
+          loaded.push(scripts.shift());
+        }
+        if (scripts[0]) {
+          loadScript();
         } else {
-          seen.user[url] = true;
+          compiler(loaded, token);
         }
       } else {
-        name = null;
-      }
-      if (!seen.user[url]) {
-        seen.user[url] = true;
-        new Request({
-          url: url,
-          onComplete: function (response) {
-            dependencies(name, response.text);
-            loadScript();
-          }
-        }).get();
-      } else {
-        loadScript();
+        var url = scripts[0].shift();
+        if (!seen[url]) {
+          seen[url] = true;
+          var request = options.createRequest({
+            url: url,
+            onComplete: function (response) {
+              dependencies(response.text);
+              loadScript();
+            }
+          })
+          request.get();
+        } else {
+          loadScript();
+        }
       }
     }
+    loadScript();
   }
-  loadScript();
 }
 
 function substitute(string, parameters) {
@@ -139,63 +123,131 @@ function XHRRequest(options) {
   return this;
 }
 
-function sendDirectives(Request, directives, uri, csrf, callback) {
-  if (directives.length) {
-    var directive = directives.shift();
-    new Request({
-      url: VERITY + "/test/directive",
-      headers: { "x-csrf-token": csrf },
-      onComplete: function () {
-        sendDirectives(Request, directives, uri, csrf, callback);
-      },
-      content: { directive: directive, base: uri }
-    }).post();
-  } else {
-    callback();
-  }
+function createXHRRequest(options) {
+  return new XHRRequest(options);
 }
 
-function createCompiler(Request, uri, base, token, csrf, inject) {
-  return function (sources) {
-    var system = sources.system, expected = 0, directives = [];
-    sources.user.forEach(function (source) {
-      source.split(/\n+/).forEach(function (line) {
-        var match = /^\s*(\/\/@\s+\S*\s+.*)$/.exec(line);
-        if (match) directives.push(match[1]);
-      });
+// Via: [Yaffle](https://gist.github.com/1088850)
+function parseURI(url) {
+  var m = String(url).replace(/^\s+|\s+$/g, '').match(/^([^:\/?#]+:)?(\/\/(?:[^:@]*(?::[^:@]*)?@)?(([^:\/?#]*)(?::(\d*))?))?([^?#]*)(\?[^#]*)?(#[\s\S]*)?/);
+  // authority = '//' + user + ':' + pass '@' + hostname + ':' port
+  return (m ? {
+    href     : m[0] || '',
+    protocol : m[1] || '',
+    authority: m[2] || '',
+    host     : m[3] || '',
+    hostname : m[4] || '',
+    port     : m[5] || '',
+    pathname : m[6] || '',
+    search   : m[7] || '',
+    hash     : m[8] || ''
+  } : null);
+}
+
+function absolutizeURI(base, href) {// RFC 3986
+
+  function removeDotSegments(input) {
+    var output = [];
+    input.replace(/^(\.\.?(\/|$))+/, '')
+         .replace(/\/(\.(\/|$))+/g, '/')
+         .replace(/\/\.\.$/, '/../')
+         .replace(/\/?[^\/]*/g, function (p) {
+      if (p === '/..') {
+        output.pop();
+      } else {
+        output.push(p);
+      }
     });
-
-    var user = indent(sources.user.join("\n\n"), 2);
-    system.boilerplate = substitute(system.boilerplate, [ token, user ]);
-
-    // We used to have more than one system script to inject, but now we have
-    // just the one. In time, if that's the way it stays, we'll come back and
-    // simplify the callbacks.
-    sendDirectives(Request, directives, base, csrf, function () {
-      // TODO URL should be based on current location.
-      system.boilerplate += "\n\n//@ sourceUrl=http://verity.prettyrobots.com/injected.js\n"
-      source = system.boilerplate;
-      inject(system.boilerplate);
-    });
+    return output.join('').replace(/^\//, input.charAt(0) === '/' ? '/' : '');
   }
+
+  href = parseURI(href || '');
+  base = parseURI(base || '');
+
+  return !href || !base ? null : (href.protocol || base.protocol) +
+         (href.protocol || href.authority ? href.authority : base.authority) +
+         removeDotSegments(href.protocol || href.authority || href.pathname.charAt(0) === '/' ? href.pathname : (href.pathname ? ((base.authority && !base.pathname ? '/' : '') + base.pathname.slice(0, base.pathname.lastIndexOf('/') + 1) + href.pathname) : base.pathname)) +
+         (href.protocol || href.authority || href.pathname ? href.search : (href.search || base.search)) +
+         href.hash;
 }
 
-function loadTest(Request, uri, text, inject) {
-  var args = text.split(/\s+/),
-      source = args.shift(),
-      token = args.shift(),
-      csrf = args.shift();
-  loadScripts(Request, source, createCompiler(Request, uri, source, token, csrf, inject));
-}
-
-function shouldTest(Request, url, inject) {
-  new Request({
-    url: VERITY + '/test/visit?url=' + escape(url),
-    onComplete: function (response) {
-      var text = response.text;
-      if (text && text != "" && text != "NONE") loadTest(Request, url, text, inject);
+// TODO Error messaging.
+function addInjection(options, base, value) {
+    var match = /^\s*(?:'((?:[^\\']|\\.)+)'|"((?:[^\\"]|\\.)+)"|\/((?:[^/\\]|\\.)+)\/)\s+(\S+)\s*$/.exec(value);
+    var target = match[1] || match[2], specials;
+    if (target) {
+      target = target.replace(/\\(.)/g, "$1")
+      specials = [
+        '/', '.', '*', '+', '?', '|',
+        '(', ')', '[', ']', '{', '}', '\\'
+      ]
+      specials = new RegExp(
+        '(\\' + specials.join('|\\') + ')', 'g'
+      )
+      target = target.replace(specials, '\\$1')
+      target = "^" + target + "$"
+    } else {
+      target = match[3];
     }
-  }).get();
+    var source = absolutizeURI(base, match[4]);
+    options.addInjection(target, source);
+}
+
+function createCompiler(options, base) {
+  return function (sources, token) {
+    var source = sources.join("\n\n"), directives = [], boilerplate, when;
+
+    source.split(/\n+/).forEach(function (line) {
+      var match = /^\s*\/\/@\s+(\S*)\s+(.*)$/.exec(line);
+      if (match) {
+        directives.push({ name: match[1], value: match[2] });
+      }
+    });
+
+    // TODO How to report errors?
+    directives.forEach(function (directive) {
+      switch (directive.name) {
+      case "when": 
+        addInjection(options, base, directive.value);
+        break;
+      case "expect":
+        when = parseInt(directive.value.trim());
+        break;
+      case "include":
+        break;
+      default:
+      }
+    });
+
+    source = indent(source, 2);
+    boilerplate = substitute(options.boilerplate, [ token, source ]);
+    boilerplate += "\n\n//@ sourceUrl=http://verity.prettyrobots.com/injected.js?" + options.url + "\n"
+    options.injector(boilerplate);
+  }
+}
+
+// TODO Need to get a reporting token from the server, but not quite yet.
+function fetchReportingToken(options, callback) { callback("X") }
+
+function shouldTest(options) {
+  var entry;
+  for (var i = 0, stop = options.injections.length; i < stop && !entry; i++) {
+    var re = new RegExp(options.injections[i].target);
+    if (re.test(options.url)) {
+      entry = options.injections[i];
+    }
+  }
+  if (entry) {
+    options.removeInjection(entry.target);
+
+    var source = entry.source;
+    var compiler = createCompiler(options, source)
+    var loader = createLoader(options, source, compiler);
+
+    fetchReportingToken(options, loader);
+  } else {
+    options.injector(null);
+  }
 }
 
 if (typeof exports != "undefined") {
