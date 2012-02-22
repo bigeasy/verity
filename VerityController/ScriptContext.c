@@ -24,6 +24,13 @@ static const GUID CLSID_TypeLibrary =
 { 0x9753946f, 0x58d1, 0x46dc,
     { 0xba, 0xb1, 0x32, 0x1c, 0x0, 0xab, 0xd0, 0x37 } };
 
+struct InjectionMap
+{
+    CRITICAL_SECTION csInjections;
+    BSTR bstrInjections;
+};
+static struct InjectionMap InjectionMap;
+
 static DWORD *pdwLockCount;
 
 static REFIID ariidImplemented[] =
@@ -160,29 +167,72 @@ IScriptContext_Invoke (IScriptContext *pSelf, DISPID dispIdNumber, REFIID refiid
 }
 
 static HRESULT STDMETHODCALLTYPE
-IScriptContext_SetString (IScriptContext *pSelf, BSTR bstr)
+IScriptContext_SetURL (IScriptContext *pSelf, BSTR bstrURL)
 {
     ScriptContext *pScriptContext = (ScriptContext *) pSelf;
-    if (pScriptContext->bstr)
+    if (pScriptContext->bstrURL)
     {
-        SysFreeString(pScriptContext->bstr);
+        SysFreeString(pScriptContext->bstrURL);
     }
-    pScriptContext->bstr = SysAllocString((OLECHAR*) bstr);
+    if (bstrURL)
+    {
+        pScriptContext->bstrURL = SysAllocString((OLECHAR*) bstrURL);
+    }
+    else
+    {
+        pScriptContext->bstrURL = NULL;
+    }
     return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE
-IScriptContext_GetString (IScriptContext *pSelf, BSTR *pbstr)
+IScriptContext_GetURL (IScriptContext *pSelf, BSTR *pbstrURL)
 {
     ScriptContext *pScriptContext = (ScriptContext *) pSelf;
-    if (pScriptContext->bstr)
+    if (pScriptContext->bstrURL)
     {
-        *pbstr = SysAllocString((OLECHAR*) pScriptContext->bstr);
+        *pbstrURL = SysAllocString((OLECHAR*) pScriptContext->bstrURL);
     }
     else
     {
-        *pbstr = NULL;
+        *pbstrURL = NULL;
     }
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_SetInjections (IScriptContext *pSelf, BSTR bstrInjections)
+{
+    EnterCriticalSection(&InjectionMap.csInjections);
+    if (InjectionMap.bstrInjections)
+    {
+        SysFreeString(InjectionMap.bstrInjections);
+    }
+    if (bstrInjections)
+    {
+        InjectionMap.bstrInjections = SysAllocString((OLECHAR*) bstrInjections);
+    }
+    else
+    {
+        InjectionMap.bstrInjections = NULL;
+    }
+    LeaveCriticalSection(&InjectionMap.csInjections);
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_GetInjections (IScriptContext *pSelf, BSTR *pbstrInjections)
+{
+    EnterCriticalSection(&InjectionMap.csInjections);
+    if (InjectionMap.bstrInjections)
+    {
+        *pbstrInjections = SysAllocString((OLECHAR*) InjectionMap.bstrInjections);
+    }
+    else
+    {
+        *pbstrInjections = NULL;
+    }
+    LeaveCriticalSection(&InjectionMap.csInjections);
     return S_OK;
 }
 
@@ -193,7 +243,8 @@ IScriptContext_GetString (IScriptContext *pSelf, BSTR *pbstr)
 static HRESULT STDMETHODCALLTYPE
 IScriptContext_CreateXHR (IScriptContext *pSelf, IDispatch** ppIDispatch)
 {
-    return CoCreateInstance(&CLSID_XMLHTTPRequest, NULL, CLSCTX_INPROC_SERVER, &IID_IDispatch, ppIDispatch);
+    return CoCreateInstance(&CLSID_XMLHTTPRequest, NULL, CLSCTX_INPROC_SERVER,
+        &IID_IDispatch, ppIDispatch);
 }
 
 static HRESULT STDMETHODCALLTYPE
@@ -211,8 +262,10 @@ IScriptContextVtbl ScriptContextVtbl =
     IScriptContext_GetTypeInfo,
     IScriptContext_GetIDsOfNames,
     IScriptContext_Invoke,
-    IScriptContext_SetString,
-    IScriptContext_GetString,
+    IScriptContext_SetURL,
+    IScriptContext_GetURL,
+    IScriptContext_SetInjections,
+    IScriptContext_GetInjections,
     IScriptContext_CreateXHR,
     IScriptContext_CreateObservable
 };
@@ -295,7 +348,7 @@ ScriptContext_CreateInstance(
         pScriptContext->PMCI.lpVtbl = &ProvideMultipleClassInfoVtbl;
         pScriptContext->PMCI.pScriptContext = (IScriptContext*) pScriptContext;
         pScriptContext->dwCount = 1;
-        pScriptContext->bstr = NULL;
+        pScriptContext->bstrURL = NULL;
 
         // Increment the library lock count.
         InterlockedIncrement(pdwLockCount);
@@ -319,8 +372,15 @@ ScriptContext_CreateInstance(
     return hr;
 }
 
+void
+ScriptContext_Finalize()
+{
+    DeleteCriticalSection(&InjectionMap.csInjections);
+}
+
 HRESULT
 ScriptContext_CreateFactory()
 {
-    return GenericFactory_CreateFactory(&CLSID_ScriptContext, ScriptContext_CreateInstance, &pdwLockCount);
+    InitializeCriticalSection(&InjectionMap.csInjections);
+    return GenericFactory_CreateFactory(&CLSID_ScriptContext, ScriptContext_CreateInstance, ScriptContext_Finalize, &pdwLockCount);
 }

@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 2.6)
 
 project(verity)
 
-file(GLOB BHO VerityController/*.c VerityController/*.idl VerityController/*.rc)
+file(GLOB BHO VerityController/*.c
+              VerityController/*.idl
+              VerityController/*.rc
+              VerityController/*.def)
 
 # In accordance with: http://public.kitware.com/Bug/view.php?id=12909
 include_directories(. "${CMAKE_CURRENT_BINARY_DIR}/\$(IntDir)")

@@ -1,4 +1,4 @@
-LIBRARY VerityController
+LIBRARY verity
 EXPORTS
 DllRegisterServer   PRIVATE
 DllUnregisterServer PRIVATE

@@ -8,10 +8,16 @@ library IScriptContext
     interface IScriptContextVtbl: IDispatch
     {
         [helpstring("Sets a string into a cubbyhole.")] 
-        [id(1)] HRESULT SetString([in] BSTR bstr);
+        [id(1), propput] HRESULT url([in] BSTR bstr);
         [helpstring("Gets a string from a cubbyhole.")] 
-        [id(2)] HRESULT GetString([out, retval] BSTR *pbstr);
+        [id(1), propget] HRESULT url([out, retval] BSTR *pbstr);
+        [helpstring("Get the injections JSON string.")]
+        [id(2), propput] HRESULT injections([in] BSTR bstrInjections);
+        [helpstring("Create an XMLHttpRequest.")]
+        [id(2), propget] HRESULT injections([out, retval] BSTR *pbstrInjections);
+        [helpstring("Set the injections JSON string.")]
         [id(3)] HRESULT createXHR([out, retval] IDispatch **ppDispatch);
+        [helpstring("Create a diagnostic object used to track object ownership.")]
         [id(4)] HRESULT createObservable([out, retval] IDispatch **pDispatch);
     }
 

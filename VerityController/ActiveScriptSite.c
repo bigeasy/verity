@@ -175,5 +175,5 @@ HRESULT
 ActiveScriptSite_CreateFactory()
 {
     return GenericFactory_CreateFactory(&CLSID_ActiveScriptSite,
-            ActiveScriptSite_CreateInstance, &pdwLockCount);
+            ActiveScriptSite_CreateInstance, GenericFactory_GenericFinalizer, &pdwLockCount);
 }

@@ -250,5 +250,5 @@ HRESULT
 ObjectWithSite_CreateFactory()
 {
     return GenericFactory_CreateFactory(&CLSID_IVerityController,
-            ObjectWithSite_CreateInstance, &pdwLockCount);
+            ObjectWithSite_CreateInstance, GenericFactory_GenericFinalizer, &pdwLockCount);
 }

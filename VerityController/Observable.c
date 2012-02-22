@@ -175,5 +175,5 @@ Observable_CreateInstance(
 HRESULT
 Observable_CreateFactory()
 {
-    return GenericFactory_CreateFactory(&CLSID_Observable, Observable_CreateInstance, &pdwLockCount);
+    return GenericFactory_CreateFactory(&CLSID_Observable, Observable_CreateInstance, GenericFactory_GenericFinalizer, &pdwLockCount);
 }

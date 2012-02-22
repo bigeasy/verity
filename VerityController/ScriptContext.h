@@ -18,8 +18,10 @@ DECLARE_INTERFACE_ (INTERFACE, IDispatch)
                                         LCID, WORD, DISPPARAMS *,
                                         VARIANT *, EXCEPINFO *, UINT *) PURE;
    // Extra functions
-   STDMETHOD  (SetString)              (THIS_ BSTR) PURE;
-   STDMETHOD  (GetString)              (THIS_ BSTR*) PURE;
+   STDMETHOD  (SetURL)                 (THIS_ BSTR) PURE;
+   STDMETHOD  (GetURL)                 (THIS_ BSTR*) PURE;
+   STDMETHOD  (SetInjections)          (THIS_ BSTR) PURE;
+   STDMETHOD  (GetInjections)          (THIS_ BSTR*) PURE;
    STDMETHOD  (CreateXHR)              (THIS_ IDispatch**) PURE;
    STDMETHOD  (CreateObservable)       (THIS_ IDispatch**) PURE;
 };
@@ -38,7 +40,7 @@ typedef struct ScriptContext
     IScriptContextVtbl *lpVtbl;
     ProvideMultipleClassInfo PMCI;
     DWORD dwCount;
-    BSTR bstr;
+    BSTR bstrURL;
 }
 ScriptContext;
 

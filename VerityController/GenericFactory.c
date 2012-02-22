@@ -90,7 +90,7 @@ static const IClassFactoryVtbl GenericFactoryVtbl = {
 
 HRESULT
 GenericFactory_CreateFactory(
-    const GUID * clsid, GenericFactory_Constructor constructor,
+    const GUID * clsid, GenericFactory_Constructor constructor, GenericFactory_Finalizer finalizer,
     DWORD **ppdwLockCount
 ) {
     HRESULT hr = S_OK;
@@ -101,7 +101,7 @@ GenericFactory_CreateFactory(
         pFactory->lpVtbl = &GenericFactoryVtbl;
         pFactory->constructor = constructor;
         pFactory->dwCount = 10;
-        pFactory->pdwLockCount = RegisterObjectFactory(clsid, (IClassFactory*) pFactory);
+        pFactory->pdwLockCount = RegisterObjectFactory(clsid, (IClassFactory*) pFactory, finalizer);
         *ppdwLockCount = pFactory->pdwLockCount;
     }
     else
@@ -109,4 +109,9 @@ GenericFactory_CreateFactory(
         hr = E_OUTOFMEMORY;
     }
     return hr;
+}
+
+void
+GenericFactory_GenericFinalizer()
+{
 }

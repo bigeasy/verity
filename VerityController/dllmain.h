@@ -1,5 +1,3 @@
 DWORD*
-RegisterObjectFactory(const GUID *clsid, IClassFactory *factory);
+RegisterObjectFactory(const GUID *clsid, IClassFactory *factory, GenericFactory_Finalizer finalizer);
 HRESULT ConstructOnDocumentHandlerFactory();
-
-HMODULE hDllModule;

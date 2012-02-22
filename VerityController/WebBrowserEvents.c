@@ -207,7 +207,7 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
 
     pActiveScript->lpVtbl->AddNamedItem(pActiveScript, L"verity", SCRIPTITEM_ISVISIBLE|SCRIPTITEM_NOCODE);
 
-    pActiveScriptParse->lpVtbl->ParseScriptText(pActiveScriptParse, L"verity.createObservable();", 0, 0, 0, 0, 0, 0, 0, 0);
+    pActiveScriptParse->lpVtbl->ParseScriptText(pActiveScriptParse, L"var url = verity.url;\n\nverity.url = url;", 0, 0, 0, 0, 0, 0, 0, 0);
     pActiveScriptParse->lpVtbl->Release(pActiveScriptParse);
     pActiveScriptParse = NULL;
 
@@ -543,5 +543,5 @@ OnDocument_CreateInstance(REFIID guidVtbl, void **ppv)
 HRESULT
 OnDocument_CreateFactory()
 {
-    return GenericFactory_CreateFactory(&CLSID_IOnDocument, OnDocument_CreateInstance, &pdwLockCount);
+    return GenericFactory_CreateFactory(&CLSID_IOnDocument, OnDocument_CreateInstance, GenericFactory_GenericFinalizer, &pdwLockCount);
 }
