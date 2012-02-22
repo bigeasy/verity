@@ -23,6 +23,7 @@ DECLARE_INTERFACE_ (INTERFACE, IDispatch)
    STDMETHOD  (SetInjections)          (THIS_ BSTR) PURE;
    STDMETHOD  (GetInjections)          (THIS_ BSTR*) PURE;
    STDMETHOD  (CreateXHR)              (THIS_ IDispatch**) PURE;
+   STDMETHOD  (Injector)               (THIS_ BSTR) PURE;
    STDMETHOD  (CreateObservable)       (THIS_ IDispatch**) PURE;
 };
 

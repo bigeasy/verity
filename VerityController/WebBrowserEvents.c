@@ -207,7 +207,7 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
 
     pActiveScript->lpVtbl->AddNamedItem(pActiveScript, L"verity", SCRIPTITEM_ISVISIBLE|SCRIPTITEM_NOCODE);
 
-    pActiveScriptParse->lpVtbl->ParseScriptText(pActiveScriptParse, L"var i = verity.injections;\n\nverity.injections = '[]';", 0, 0, 0, 0, 0, 0, 0, 0);
+    pActiveScriptParse->lpVtbl->ParseScriptText(pActiveScriptParse, L"verity.createObservable();\nverity.createXHR();\nverity.injector('!');", 0, 0, 0, 0, 0, 0, 0, 0);
     pActiveScriptParse->lpVtbl->Release(pActiveScriptParse);
     pActiveScriptParse = NULL;
 

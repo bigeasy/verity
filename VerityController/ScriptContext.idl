@@ -17,8 +17,10 @@ library IScriptContext
         [id(2), propget] HRESULT injections([out, retval] BSTR *pbstrInjections);
         [helpstring("Set the injections JSON string.")]
         [id(3)] HRESULT createXHR([out, retval] IDispatch **ppDispatch);
+        [helpstring("Inject generated script into browser.")]
+        [id(4)] HRESULT injector([in] BSTR bstrInjection);
         [helpstring("Create a diagnostic object used to track object ownership.")]
-        [id(4)] HRESULT createObservable([out, retval] IDispatch **pDispatch);
+        [id(5)] HRESULT createObservable([out, retval] IDispatch **pDispatch);
     }
 
     [uuid(7CD57D42-C553-4B82-A52A-513082F57EE0),

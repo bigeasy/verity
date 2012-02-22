@@ -248,6 +248,12 @@ IScriptContext_CreateXHR (IScriptContext *pSelf, IDispatch** ppIDispatch)
 }
 
 static HRESULT STDMETHODCALLTYPE
+IScriptContext_Injector (IScriptContext *pSelf, BSTR bstrInjector)
+{
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
 IScriptContext_CreateObservable(IScriptContext *pSelf, IDispatch** ppIDispatch)
 {
     return GenericFactory_CreateInstance(L"{3C8C461C-5543-468A-A0D2-334C6B6E54E8}", &IID_IDispatch, ppIDispatch);
@@ -267,6 +273,7 @@ IScriptContextVtbl ScriptContextVtbl =
     IScriptContext_SetInjections,
     IScriptContext_GetInjections,
     IScriptContext_CreateXHR,
+    IScriptContext_Injector,
     IScriptContext_CreateObservable
 };
 
