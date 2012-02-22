@@ -375,6 +375,12 @@ ScriptContext_CreateInstance(
 void
 ScriptContext_Finalize()
 {
+    EnterCriticalSection(&InjectionMap.csInjections);
+    if (InjectionMap.bstrInjections)
+    {
+        SysFreeString(InjectionMap.bstrInjections);
+    }
+    LeaveCriticalSection(&InjectionMap.csInjections);
     DeleteCriticalSection(&InjectionMap.csInjections);
 }
 
