@@ -86,6 +86,7 @@ HookSite(ObjectWithSite* pVerity)
     IUnknown* pSite = pVerity->pSite;
     IConnectionPointContainer* pCPC;
     IConnectionPoint* pCP;
+    IUnknown *pOnDocument;
 
     /* Get the connection point collection. Ask for the web browser connection
      * point. Register a callback. The callback will be called for dozens of
@@ -112,7 +113,8 @@ HookSite(ObjectWithSite* pVerity)
     Log(_T("Got dispatch connection point.\n"));
 
     /* Register out web browser events callback function. */
-    err = pCP->lpVtbl->Advise(pCP, (IUnknown *) &WebBrowserEvents, &pVerity->dwSiteAdviseCookie);
+    GenericFactory_CreateInstance(L"{42939237-42F0-4E3F-818E-FA63E4EB5A82}", &IID_IUnknown, &pOnDocument);
+    err = pCP->lpVtbl->Advise(pCP, pOnDocument, &pVerity->dwSiteAdviseCookie);
     IsOkay(err, undoConnectionPoint);
     Log(_T("Connection point advised.\n"));
 
@@ -121,6 +123,7 @@ HookSite(ObjectWithSite* pVerity)
 
     /* Or else cleanup on error. */
 undoConnectionPoint:
+    Log(L"Failed on connection point %d.", err == CONNECT_E_CANNOTCONNECT);
     pCP->lpVtbl->Release(pCP);
 undoSetSite:
     pVerity->pSite->lpVtbl->Release(pVerity->pSite);

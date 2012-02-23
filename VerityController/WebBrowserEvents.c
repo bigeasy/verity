@@ -4,6 +4,8 @@
 #include "Jumps.h"
 #include "GenericFactory.h"
 #include "ComponentObjectModel.h"
+#include "ScriptContext.h"
+#include "ActiveScriptSite.h"
 #include "Pool.h"
 #include <Winhttp.h>
 
@@ -30,10 +32,11 @@ static REFIID ariidImplemented[] =
 {
     &IID_IUnknown,
     &IID_IDispatch,
+    &DIID_DWebBrowserEvents2,
     NULL
 };
 
-QUERY_INTERFACE( IDispatch, ariidImplemented)
+QUERY_INTERFACE(IDispatch, ariidImplemented)
 REFERENCE_COUNT(IDispatch, OnDocument, pdwLockCount, NO_DESTRUCTOR)
 
 static HRESULT STDMETHODCALLTYPE
@@ -194,6 +197,7 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
     IActiveScriptSite *pActiveScriptSite = NULL;
     IActiveScriptParse *pActiveScriptParse = NULL;
     GUID guidJavaScript;
+    ActiveScriptSite *pSite = NULL;
 
     GetEngineGUID(L".js", &guidJavaScript);
     hr = CoCreateInstance(&guidJavaScript, 0, CLSCTX_ALL, &IID_IActiveScript, (LPVOID*)&pActiveScript);
@@ -204,6 +208,8 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
     pActiveScriptParse->lpVtbl->InitNew(pActiveScriptParse);
 
     hr = CoCreateInstance(&CLSID_ActiveScriptSite, 0, CLSCTX_INPROC_SERVER, &IID_IActiveScriptSite, (LPVOID*)&pActiveScriptSite);
+    pSite = (ActiveScriptSite*) pActiveScriptSite;
+    pSite->pScriptContext->lpVtbl->SetURL((IScriptContext*)pSite->pScriptContext, bstrReferer);
     pActiveScript->lpVtbl->SetScriptSite(pActiveScript, pActiveScriptSite);
 
     pActiveScript->lpVtbl->AddNamedItem(pActiveScript, L"verity", SCRIPTITEM_ISVISIBLE|SCRIPTITEM_NOCODE);
@@ -214,7 +220,7 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
 
     pActiveScript->lpVtbl->SetScriptState(pActiveScript, SCRIPTSTATE_CONNECTED);
 
-    pActiveScript->lpVtbl->Close(pActiveScript);
+ /*   pActiveScript->lpVtbl->Close(pActiveScript);
 
     if (pActiveScriptParse)
     {
@@ -224,7 +230,7 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
     if (pActiveScript)
     {
         pActiveScript->lpVtbl->Release(pActiveScript);
-    }
+    }*/
 
     return hr;
 }
@@ -375,9 +381,9 @@ IDispatch_Invoke(
         // therefore it is the last argument here. The IDispatch pointer is
         // inside a VARIANT, so we need to go from the argument variant,
         // through a variant to get to our IDispatch.
+        Log(_T("Document HOOOKED! %d\n"), GetCurrentThreadId());
         err = OnDocumentComplete(pDispParams->rgvarg[1].pvarVal->pdispVal,
                                  pDispParams->rgvarg[0].bstrVal);
-        Log(_T("Document HOOOKED! %d\n"), GetCurrentThreadId());
     }
     return err;
 }
@@ -541,7 +547,7 @@ OnDocument_CreateInstance(REFIID guidVtbl, void **ppv)
     return hr;
 }
 
-WCHAR *Scripts[] = { L"json2.js", L"boilerplate.js", L"background.js", /*L"ie.js",*/ NULL };
+WCHAR *Scripts[] = { L"json2.js", L"boilerplate.js", L"background.js", L"ie.js", NULL };
 
 struct ScriptSource
 {

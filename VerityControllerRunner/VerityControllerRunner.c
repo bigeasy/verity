@@ -79,7 +79,7 @@ static IDispatch BogusDispatch = { &IBogusDispatchVtbl };
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-    HRESULT hr;
+    HRESULT hr = -1073741819;
     GUID guidVerityController, guidOnDocument;
     IObjectWithSite *pVerityController;
     IDispatch *pOnDocument;
