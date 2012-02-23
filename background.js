@@ -202,7 +202,7 @@ function createCompiler(options, base) {
 
     // TODO How to report errors?
     var lines = source.split(/\n+/);
-    for (var i = 0, stop = lines.length; i++) {
+    for (var i = 0, stop = lines.length; i < stop; i++) {
       var match = /^\s*\/\/@\s+(\S*)\s+(.*)$/.exec(lines[i]);
       if (match) {
         switch (match[1]) {
