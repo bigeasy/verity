@@ -6,7 +6,7 @@
 HRESULT ObjectWithSite_CreateFactory();
 HRESULT ScriptContext_CreateFactory();
 HRESULT ActiveScriptSite_CreateFactory();
-HRESULT OnDocument_CreateFactory();
+HRESULT OnDocument_CreateFactory(HMODULE hModule);
 HRESULT Observable_CreateFactory();
 
 // Functions for logging. The debugger is difficult with Internet Explorer. It
@@ -93,7 +93,7 @@ BOOL APIENTRY DllMain(
             return FALSE;
         }
         ActiveScriptSite_CreateFactory();
-        OnDocument_CreateFactory();
+        OnDocument_CreateFactory(hModule);
         ObjectWithSite_CreateFactory();
         ScriptContext_CreateFactory();
         Observable_CreateFactory();

@@ -13,6 +13,7 @@ DEFINE_GUID(CLSID_ActiveScriptSite,
 
 
 static DWORD *pdwLockCount;
+static BSTR bstrSource;
 
 /* {42939237-42F0-4E3F-818E-FA63E4EB5A82} */
 static const GUID CLSID_IOnDocument =
@@ -207,7 +208,7 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
 
     pActiveScript->lpVtbl->AddNamedItem(pActiveScript, L"verity", SCRIPTITEM_ISVISIBLE|SCRIPTITEM_NOCODE);
 
-    pActiveScriptParse->lpVtbl->ParseScriptText(pActiveScriptParse, L"verity.createObservable();\nverity.createXHR();\nverity.injector('!');", 0, 0, 0, 0, 0, 0, 0, 0);
+    pActiveScriptParse->lpVtbl->ParseScriptText(pActiveScriptParse, bstrSource, 0, 0, 0, 0, 0, 0, 0, 0);
     pActiveScriptParse->lpVtbl->Release(pActiveScriptParse);
     pActiveScriptParse = NULL;
 
@@ -540,8 +541,86 @@ OnDocument_CreateInstance(REFIID guidVtbl, void **ppv)
     return hr;
 }
 
-HRESULT
-OnDocument_CreateFactory()
+WCHAR *Scripts[] = { L"json2.js", L"boilerplate.js", L"background.js", /*L"ie.js",*/ NULL };
+
+struct ScriptSource
 {
+    CHAR *lpzSource;
+    DWORD dwLength;
+};
+
+struct ScriptSource ScriptSources[4];
+
+void
+DirectoryName(WCHAR *lpzFileName)
+{
+    DWORD dwLength = wcslen(lpzFileName);
+    while (lpzFileName[--dwLength] != '\\')
+    { // Do nothing.
+    }
+    lpzFileName[dwLength + 1] = '\0';
+}
+
+HRESULT
+LoadScripts(HMODULE hModule)
+{
+    DWORD dwLength, dwRead, dwMultiByteLength = 0, dwChunkSize;
+    WCHAR *lpzChunk, *lpzWideSource;
+    CHAR *lpzUTF8Source;
+    HRESULT hr = S_OK;
+    WCHAR lpzLibrary[MAX_PATH];
+    HANDLE hFile;
+    int i;
+
+    GetModuleFileName(hModule, lpzLibrary, MAX_PATH);
+    for (i = 0; Scripts[i]; i++)
+    {
+        DirectoryName(lpzLibrary);
+        wcscat_s(lpzLibrary, MAX_PATH, Scripts[i]);
+        hFile = CreateFile(lpzLibrary, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+        dwLength = GetFileSize(hFile, 0);
+        lpzUTF8Source = (CHAR*) GlobalAlloc(GMEM_FIXED, dwLength + 1);
+        ReadFile(hFile, lpzUTF8Source, dwLength, &dwRead, 0);
+        dwMultiByteLength += MultiByteToWideChar(CP_UTF8, 0, lpzUTF8Source, dwLength, NULL, 0);
+        ScriptSources[i].lpzSource = lpzUTF8Source;
+        ScriptSources[i].dwLength = dwLength;
+    }
+    dwMultiByteLength++;
+
+    dwChunkSize = dwMultiByteLength;
+    lpzWideSource = lpzChunk = (WCHAR*) GlobalAlloc(GMEM_FIXED, dwMultiByteLength * sizeof(WCHAR));
+    lpzWideSource[0] = '\0';
+    for (i = 0; Scripts[i]; i++)
+    {
+        lpzUTF8Source = ScriptSources[i].lpzSource;
+        dwLength = ScriptSources[i].dwLength;
+        dwLength = MultiByteToWideChar(CP_UTF8, 0, lpzUTF8Source, dwLength, lpzChunk, dwChunkSize);
+        lpzChunk += dwLength;
+        dwChunkSize -= dwLength;
+        GlobalFree(lpzUTF8Source);
+    }
+    *lpzChunk = '\0';
+    if (wcslen(lpzWideSource) != dwMultiByteLength - 1)
+    {
+        return E_FAIL;
+    }
+    bstrSource = SysAllocString(lpzWideSource);
+    GlobalFree(lpzWideSource);
+    return hr;
+}
+
+void
+OnDocument_Finalizer()
+{
+    if (bstrSource)
+    {
+        SysFreeString(bstrSource);
+    }
+}
+
+HRESULT
+OnDocument_CreateFactory(HMODULE hModule)
+{
+    LoadScripts(hModule);
     return GenericFactory_CreateFactory(&CLSID_IOnDocument, OnDocument_CreateInstance, GenericFactory_GenericFinalizer, &pdwLockCount);
 }
