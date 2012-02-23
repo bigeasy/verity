@@ -1,5 +1,5 @@
 // TODO Parameterize.
-const VERITY = "http://verity:8078";
+var VERITY = "http://verity:8078";
 var CUBBY;
 
 function createLoader(options, source, compiler) {
@@ -200,27 +200,24 @@ function createCompiler(options, base) {
   return function (sources, token) {
     var source = sources.join("\n\n"), directives = [], boilerplate, when;
 
-    source.split(/\n+/).forEach(function (line) {
-      var match = /^\s*\/\/@\s+(\S*)\s+(.*)$/.exec(line);
-      if (match) {
-        directives.push({ name: match[1], value: match[2] });
-      }
-    });
-
     // TODO How to report errors?
-    directives.forEach(function (directive) {
-      switch (directive.name) {
-      case "when": 
-        addInjection(options, base, directive.value);
-        break;
-      case "expect":
-        when = parseInt(directive.value.trim());
-        break;
-      case "include":
-        break;
-      default:
+    var lines = source.split(/\n+/);
+    for (var i = 0, stop = lines.length; i++) {
+      var match = /^\s*\/\/@\s+(\S*)\s+(.*)$/.exec(lines[i]);
+      if (match) {
+        switch (match[1]) {
+        case "when": 
+          addInjection(options, base, match[2]);
+          break;
+        case "expect":
+          when = parseInt(match[2].trim());
+          break;
+        case "include":
+          break;
+        default:
+        }
       }
-    });
+    }
 
     source = indent(source, 2);
     boilerplate = substitute(options.boilerplate, [ token, source ]);
