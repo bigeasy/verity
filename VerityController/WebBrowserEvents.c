@@ -9,11 +9,6 @@
 #include "Pool.h"
 #include <Winhttp.h>
 
-// {73C6AB50-2BEE-4DC0-AB1C-910C255D1C23}
-DEFINE_GUID(CLSID_ActiveScriptSite, 
-0x73c6ab50, 0x2bee, 0x4dc0, 0xab, 0x1c, 0x91, 0xc, 0x25, 0x5d, 0x1c, 0x23);
-
-
 static DWORD *pdwLockCount;
 static BSTR bstrSource;
 
@@ -76,55 +71,6 @@ IDispatch_GetIDsOfNames(
 // of IXMLHttpRequest, that of accepting an IDispatch interface objet as a
 // readystatechange handler, through direct assignment of the handler, but not
 // through QueryInterface.
-// TODO Create a QueryInterface that will assert to ensure that IXHMLHttpRequest
-// does what we expect it to do, out of curiosity more than correctness. 
-typedef struct CReadyStateChange IReadyStateChange;
-
-typedef HRESULT(*OnReadyStateComplete)(IReadyStateChange* pRSC);
-
-typedef struct CReadyStateChange {
-    const IDispatchVtbl*    lpVtbl;
-    IWebBrowser2*           pBrowser;
-    IXMLHttpRequest*        pXHR;
-    HANDLE                  hPool;
-    OnReadyStateComplete    pOnReadyStateComplete;
-} IReadyStateChange;
-
-static const IDispatchVtbl IReadyStateChangeVtbl;
-
-// Performs a HTTP request using the IXMLHttpRequest allocated at startup. If
-// this method fails, it is up to the caller to release the pool.
-static HRESULT
-HttpRequest(
-    IReadyStateChange* pRSC, BSTR bstrMethod, BSTR bstrURL, VARIANT* pvBody
-) { 
-    HRESULT err;
-    VARIANT vAsync, vUser, vPassword, vBody;
-    IXMLHttpRequest* pXHR = pRSC->pXHR;
-    
-    VariantInit(&vAsync);
-    vAsync.vt = VT_BOOL;
-    vAsync.boolVal = TRUE;
-    
-    VariantInit(&vUser);
-    vUser.vt = VT_EMPTY;
-    
-    VariantInit(&vPassword);
-    vUser.vt = VT_EMPTY;
-
-    VariantInit(&vBody);
-    vBody.vt = VT_EMPTY;
-
-    err = pXHR->lpVtbl->open(pXHR, bstrMethod, bstrURL, vAsync, vUser, vPassword);
-    IsOkay(err, exit);
-    
-    err = pXHR->lpVtbl->put_onreadystatechange(pXHR, (IDispatch*) pRSC);
-    IsOkay(err, exit);
-
-    err = pXHR->lpVtbl->send(pXHR, vBody);
-exit:
-    return err;
-}
 
 static HRESULT
 GetEngineName(LPCTSTR buffer, int length, LPCTSTR subKey)
@@ -210,7 +156,7 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
 
     pActiveScriptParse->lpVtbl->InitNew(pActiveScriptParse);
 
-    hr = CoCreateInstance(&CLSID_ActiveScriptSite, 0, CLSCTX_INPROC_SERVER, &IID_IActiveScriptSite, (LPVOID*)&pActiveScriptSite);
+    hr = GenericFactory_CreateInstance(L"{73C6AB50-2BEE-4DC0-AB1C-910C255D1C23}", &IID_IActiveScriptSite, &pActiveScriptSite);
     pSite = (ActiveScriptSite*) pActiveScriptSite;
     pSite->pScriptContext->lpVtbl->SetURL((IScriptContext*)pSite->pScriptContext, bstrReferer);
     pActiveScript->lpVtbl->SetScriptSite(pActiveScript, pActiveScriptSite);
@@ -236,81 +182,6 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
     }*/
 
     return hr;
-}
-
-static HRESULT
-_OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
-{
-    // Made sure to add a bunch of extra lower case letters to the start of all
-    // my variables so this code could have that Microsoft look and feel.
-    HRESULT             err;
-    IWebBrowser2*       pBrowser;
-    HANDLE              hPool;
-    IReadyStateChange*  pRSC;
-    BSTR                bstrMethod;
-    BSTR                bstrURL;
-    VARIANT*            pvBody;
-    IXMLHttpRequest*    pXHR;
-
-    // The pool manages memory, strings, and interface handles, as well as
-    // doubly-linked list nodes used to form arbitrary lists as needed.
-    hPool = PoolAllocPool();
-    IsAllocated(hPool, err, exit);
-
-    // We create a structure to track state while making web requests for test
-    // resources. This structure is also the IDispatch interface given to the
-    // IXMLHttpRequest as a callback for ready state changes.
-    pRSC = (IReadyStateChange*) PoolAllocMemory(hPool, sizeof(IReadyStateChange));
-    IsAllocated(pRSC, err, releasePool);
-
-    // We want to grab an IWebBrowser2 interface handle now, to increment the
-    // reference count, otherwise it might get collected while we're waiting on
-    // HTTP requests.
-    err = PoolQueryInterface(hPool, pDispatch, &IID_IWebBrowser2, &pBrowser);
-    IsOkay(err, releasePool);
-
-    // Allocate an IXMLHttpRequest to use for this test run.
-    err = PoolCoCreateInstance(hPool, &CLSID_XMLHTTPRequest, &IID_IXMLHttpRequest, &pXHR);
-    IsOkay(err, exit);
-
-    // In the future, during other callbacks, all resources allocated during
-    // test processing can be collected by freeing the hPool member of the
-    // IReadyStateChange structure, including the IReadyStateChange structure
-    // itself. That is, the IReadyStateChange has a reference to the pool, but
-    // the pool still manages and frees the memory allocated for the
-    // IReadyStateChange structure itself.
-    pRSC->hPool     = hPool;
-    pRSC->lpVtbl    = &IReadyStateChangeVtbl;
-    pRSC->pBrowser  = pBrowser;
-    pRSC->pXHR      = pXHR;
-
-    // We're going to end up handing over this variant to the send method of
-    // IXMLHttpRequest. I don't know if IXMLHttpRequest will be done with the
-    // variant when send returns, of if it will hold onto it and send it out
-    // over the wire in chunks, so creating a variant on the heap, and
-    // duplicating the string are both in defense of a delayed read.
-    pvBody = (VARIANT*) PoolAllocMemory(hPool, sizeof(VARIANT));
-    IsAllocated(pvBody, err, releasePool);
-
-    VariantInit(pvBody);
-    pvBody->vt = VT_BSTR;
-    pvBody->bstrVal = PoolAllocString(hPool, bstrReferer);
-    IsAllocated(pvBody->bstrVal, err, releasePool);
-
-    bstrMethod = PoolAllocString(hPool, L"POST");
-    IsAllocated(bstrMethod, err, releasePool);
-
-    bstrURL = PoolAllocString(hPool, L"http://verity:8078/test/expected");
-    IsAllocated(bstrURL, err, releasePool);
-
-    err = HttpRequest(pRSC, bstrMethod, bstrURL, pvBody);
-    IsOkay(err, releasePool);
-
-    Done(exit);
-releasePool:
-    PoolFreePool(hPool);
-exit:
-    return err;
 }
 
 static HRESULT
@@ -392,119 +263,8 @@ IDispatch_Invoke(
     return err;
 }
 
-HRESULT
-SplitBoilerPlate(HANDLE hPool, LISTNODE* pNode)
+static const IDispatchVtbl OnDocumentVtbl =
 {
-    return S_OK;
-}
-
-static HRESULT
-OnBoilerplateComplete(IReadyStateChange* pRSC)
-{
-    HRESULT err;
-    IXMLHttpRequest* pXHR = pRSC->pXHR;
-    HANDLE hPool = pRSC->pXHR;
-    BSTR bstrResponseText, bstrMethod, bstrURL;
-    VARIANT vBody;
-
-    err = pXHR->lpVtbl->get_responseText(pXHR, &bstrResponseText);
-    if (wcsstr(bstrResponseText, L"NONE"))
-    {
-        goto terminate;
-    }
-    else
-    {
-        bstrMethod = PoolAllocString(hPool, L"GET");
-        IsAllocated(bstrMethod, err, terminate);
-
-        bstrURL = PoolAllocString(hPool, bstrResponseText);
-        IsAllocated(bstrMethod, err, terminate);
-
-        VariantInit(&vBody);
-        vBody.vt = VT_EMPTY;
-
-        err = HttpRequest(pRSC, bstrMethod, bstrURL, &vBody);
-        IsOkay(err, terminate);
-    }
-    Done(exit);
-terminate:
-    PoolFreePool(hPool);
-exit:
-    return err;
-}
-
-static HRESULT
-OnExpectComplete(IReadyStateChange* pRSC)
-{
-    HRESULT err;
-    IXMLHttpRequest* pXHR = pRSC->pXHR;
-    HANDLE hPool = pRSC->hPool;
-    BSTR bstrResponseText;
-    BSTR bstrMethod, bstrURL;
-    VARIANT vBody;
-
-    err = pXHR->lpVtbl->get_responseText(pXHR, &bstrResponseText);
-    if (wcsstr(bstrResponseText, L"NONE"))
-    {
-        goto terminate;
-    }
-    else
-    {
-        bstrMethod = PoolAllocString(hPool, L"GET");
-        IsAllocated(bstrMethod, err, terminate);
-
-        bstrURL = PoolAllocString(hPool, bstrResponseText);
-        IsAllocated(bstrMethod, err, terminate);
-
-        VariantInit(&vBody);
-        vBody.vt = VT_EMPTY;
-
-        err = HttpRequest(pRSC, bstrMethod, bstrURL, &vBody);
-        IsOkay(err, terminate);
-    }
-    Done(exit);
-terminate:
-    PoolFreePool(hPool);
-exit:
-    return err;
-}
-
-static HRESULT STDMETHODCALLTYPE
-IReadyStateChange_Invoke(
-    IDispatch* pSelf,
-    DISPID dispIdMember,
-    REFIID riid,
-    LCID lcid,
-    WORD wFlags,
-    DISPPARAMS *pDispParams,
-    VARIANT *pVarResult,
-    EXCEPINFO *pExcepInfo,
-    UINT *puArgErr
-) {
-    long lState;
-    HRESULT err             = S_OK;
-    IReadyStateChange* pRSC = (IReadyStateChange*) pSelf;
-    IXMLHttpRequest* pXHR   = pRSC->pXHR;
-    Log(_T("Ready State Has Changed! %d\n"), GetCurrentThreadId());
-    // If this fails, we're in a bad place, because freeing the
-    // IXMLHttpRequest when it is this disfunctional, how can you know that
-    // it is going actually cancel?
-    err = pXHR->lpVtbl->get_readyState(pXHR, &lState);
-    IsOkay(err, teriminate);
-    if (lState == READYSTATE_COMPLETE)
-    {
-        err = pRSC->pOnReadyStateComplete(pRSC);
-        IsOkay(err, teriminate);
-    }
-    Done(exit);
-teriminate:
-    pXHR->lpVtbl->abort(pXHR);
-    PoolFreePool(pRSC->hPool);
-exit:
-    return err;
-}
-        
-static const IDispatchVtbl OnDocumentVtbl = {
     IDispatch_QueryInterface,
     IDispatch_AddRef,
     IDispatch_Release,

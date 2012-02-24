@@ -60,7 +60,6 @@ OpenLog()
     OFSTRUCT ofstruct;
     if (! hfLog) {
         hfLog = OpenFile("C:\\codearea\\touched.txt", &ofstruct, OF_CREATE);
-        Log(_T("Log was not open.\n"));
     }
 }
 #else
@@ -86,7 +85,6 @@ BOOL APIENTRY DllMain(
         hDllModule = hModule;
         DllRegisterServer();
         GetModuleFileName(NULL, pszLoader, MAX_PATH);
-        Log(_T("Process Attaching: %s\n"), pszLoader);
         _tcslwr_s(pszLoader, MAX_PATH);
         if (_tcsstr(pszLoader, _T("explorer.exe")))
         {
@@ -97,14 +95,12 @@ BOOL APIENTRY DllMain(
         ObjectWithSite_CreateFactory();
         ScriptContext_CreateFactory();
         Observable_CreateFactory();
-        Log(L"Here I Am!\n");
         hDllModule = hModule;
         break;
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
         break;
 	case DLL_PROCESS_DETACH:
-        Log(_T("Process Detaching.\n"), pszLoader);
 		break;
 	}
 
@@ -234,7 +230,6 @@ DWORD*
 RegisterObjectFactory(const GUID *clsid, IClassFactory *pFactory, GenericFactory_Finalizer finalizer)
 {
     IFactoryMapping *fm;
-    Log(L"Factory registered! %d\n", dwFactoryCount);
     fm = &afmRegisteredFactories[dwFactoryCount++];
     fm->clsid = clsid;
     fm->pFactory = pFactory;
@@ -249,11 +244,9 @@ GenericFactory_GetFactory(REFCLSID guidObject, REFIID guidFactory, LPVOID *ppvFa
     int i;
     for (i = 0; i < dwFactoryCount; i++)
     {
-        Log(L"What is library %d?\n", i);
         if (IsEqualCLSID(guidObject, afmRegisteredFactories[i].clsid))
         {
             pFactory = afmRegisteredFactories[i].pFactory;
-            Log(L"It's a hit! %d\n", pFactory == NULL);
             return pFactory->lpVtbl->
                 QueryInterface(pFactory, guidFactory, ppvFactory);
         }
@@ -297,7 +290,6 @@ GenericFactory_CreateInstance(LPCTSTR clsid, REFIID riid, LPVOID *pObject)
 HRESULT __stdcall DllCanUnloadNow(void)
 {
     int i;
-    Log(_T("Asking about unloading: %d\n"), S_OK);
     for (i = 0; i < dwFactoryCount; i++)
     {
         if (afmRegisteredFactories[i].dwLockCount)

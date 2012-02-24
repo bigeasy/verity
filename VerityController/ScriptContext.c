@@ -236,7 +236,7 @@ IScriptContext_GetInjections (IScriptContext *pSelf, BSTR *pbstrInjections)
         *pbstrInjections = NULL;
     }
     LeaveCriticalSection(&InjectionMap.csInjections);
-    Log(L"GetURL %s\n", *pbstrInjections);
+    Log(L"GetInjections %s\n", *pbstrInjections);
     return S_OK;
 }
 

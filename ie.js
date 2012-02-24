@@ -1,11 +1,3 @@
-var flattenedInjections = verity.injections;
-var injections = [];
-for (var i = 0; i < flattenedInjections.length; i += 2) {
-  injections.push({
-    target: flattenedInjections[i],
-    source: flattenedInjections[i + 1]
-  });
-}
 shouldTest({
   url: verity.url,
   boilerplate: boilerplate,
@@ -24,7 +16,7 @@ shouldTest({
     injections.push({ target: target, source: source });
     verity.injections = JSON.stringify(injections);
   },
-  injections: injections.concat({
+  injections: JSON.parse(verity.injections || "[]").concat({
     target: /jekyllrb.com/.toString(),
     source: "http://dossier:8048/verity/user/landing/index.js"
   }),
