@@ -240,6 +240,39 @@ IScriptContext_GetInjections (IScriptContext *pSelf, BSTR *pbstrInjections)
     return S_OK;
 }
 
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_SetDocument (IScriptContext *pSelf, IDispatch *pDocument)
+{
+    ScriptContext *pScriptContext = (ScriptContext*) pSelf;
+    Log(L"SET DOCUMENT\n");
+    if (pScriptContext->pDocument)
+    {
+        pScriptContext->pDocument->lpVtbl->Release(pScriptContext->pDocument);
+        pScriptContext->pDocument = NULL;
+    }
+    if (pDocument)
+    {
+        pDocument->lpVtbl->AddRef(pDocument);
+        pScriptContext->pDocument = pDocument;
+    }
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_GetDocument (IScriptContext *pSelf, IDispatch **ppDocument)
+{
+    ScriptContext *pScriptContext = (ScriptContext*) pSelf;
+    IDispatch *pDocument = NULL;
+    if (pScriptContext->pDocument)
+    {
+        pDocument = pScriptContext->pDocument;
+        pDocument->lpVtbl->AddRef(pDocument);
+    }
+    Log(L"GET DOCUMENT: %d\n", pDocument != NULL);
+    *ppDocument = pDocument;
+    return S_OK;
+}
+
 /* Testing with a bogus object shows that the caller will decrement the
  * reference once, without incrementing it, so if we do not increase the
  * reference count, the script engine will send the reference count to zero,
@@ -255,7 +288,21 @@ IScriptContext_CreateXHR (IScriptContext *pSelf, IDispatch** ppIDispatch)
 static HRESULT STDMETHODCALLTYPE
 IScriptContext_Injector (IScriptContext *pSelf, BSTR bstrInjector)
 {
-    Log(L"Injector.\n");
+    DWORD dwCount;
+    ScriptContext *pScriptContext = (ScriptContext*) pSelf;
+    IActiveScript *pActiveScript = pScriptContext->pActiveScript;
+    Log(L"Injector! %d\n", pActiveScript == NULL);
+    pActiveScript->lpVtbl->Close(pActiveScript);
+    dwCount = pActiveScript->lpVtbl->Release(pActiveScript);
+    Log(L"Injector: %d.\n", dwCount);
+    pScriptContext->pActiveScript = NULL;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_Log(IScriptContext *pSelf, BSTR bstrMessage)
+{
+    Log(L"%s\n", bstrMessage);
     return S_OK;
 }
 
@@ -278,8 +325,11 @@ IScriptContextVtbl ScriptContextVtbl =
     IScriptContext_GetURL,
     IScriptContext_SetInjections,
     IScriptContext_GetInjections,
+    IScriptContext_SetDocument,
+    IScriptContext_GetDocument,
     IScriptContext_CreateXHR,
     IScriptContext_Injector,
+    IScriptContext_Log,
     IScriptContext_CreateObservable
 };
 
@@ -362,6 +412,8 @@ ScriptContext_CreateInstance(
         pScriptContext->PMCI.pScriptContext = (IScriptContext*) pScriptContext;
         pScriptContext->dwCount = 1;
         pScriptContext->bstrURL = NULL;
+        pScriptContext->pDocument = NULL;
+        pScriptContext->pActiveScript = NULL;
 
         // Increment the library lock count.
         InterlockedIncrement(pdwLockCount);
@@ -380,8 +432,6 @@ ScriptContext_CreateInstance(
 
         *ppv = pScriptContext;
     }
-
-    Log(_T("Allocated: %d\n"), hr);
     return hr;
 }
 

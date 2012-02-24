@@ -20,6 +20,13 @@ shouldTest({
     target: /jekyllrb.com/.toString(),
     source: "http://dossier:8048/verity/user/landing/index.js"
   }),
-  createRequest: createXHRRequest(function () { return verity.createXHR() }),
-  injector: function (source) { verity.injector(source) }
+  createRequest: createXHRRequest(function () {
+    return verity.createXHR()
+  }),
+  injector: function (source) {
+    if (source) {
+        verity.document.parentWindow.execScript(source);
+    }
+    verity.injector("");
+  }
 });

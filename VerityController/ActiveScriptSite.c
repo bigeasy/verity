@@ -149,7 +149,8 @@ ActiveScriptSite_CreateInstance(
         // Set the virtual function table and reference count.
         pActiveScriptSite->lpVtbl = &ActiveScriptSiteVtbl;
         pActiveScriptSite->dwCount = 1;
-        CoCreateInstance(&CLSID_ScriptContext, NULL, CLSCTX_INPROC_SERVER, &IID_IDispatch, (LPVOID*)&pActiveScriptSite->pScriptContext);
+        CoCreateInstance(&CLSID_ScriptContext, NULL, CLSCTX_INPROC_SERVER,
+                &IID_IDispatch, (LPVOID*)&pActiveScriptSite->pScriptContext);
 
         // Increment the library lock count.
         InterlockedIncrement(pdwLockCount);

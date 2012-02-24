@@ -22,8 +22,11 @@ DECLARE_INTERFACE_ (INTERFACE, IDispatch)
    STDMETHOD  (GetURL)                 (THIS_ BSTR*) PURE;
    STDMETHOD  (SetInjections)          (THIS_ BSTR) PURE;
    STDMETHOD  (GetInjections)          (THIS_ BSTR*) PURE;
+   STDMETHOD  (SetDocument)            (THIS_ IDispatch*) PURE;
+   STDMETHOD  (GetDocument)            (THIS_ IDispatch**) PURE;
    STDMETHOD  (CreateXHR)              (THIS_ IDispatch**) PURE;
    STDMETHOD  (Injector)               (THIS_ BSTR) PURE;
+   STDMETHOD  (Log)                    (THIS_ BSTR) PURE;
    STDMETHOD  (CreateObservable)       (THIS_ IDispatch**) PURE;
 };
 
@@ -42,6 +45,8 @@ typedef struct ScriptContext
     ProvideMultipleClassInfo PMCI;
     DWORD dwCount;
     BSTR bstrURL;
+    IDispatch *pDocument;
+    IActiveScript *pActiveScript;
 }
 ScriptContext;
 

@@ -20,6 +20,7 @@ typedef struct OnDocument
 {
     const IDispatchVtbl *lpVtbl;
     DWORD dwCount;
+    IActiveScript *pActiveScript;
 }
 OnDocument;
 
@@ -65,7 +66,7 @@ IDispatch_GetIDsOfNames(
     return DISP_E_UNKNOWNNAME;
 }
 
-// TODO XHR doe snot have timeout mechanism, so we're going to have to use the
+// TODO XHR does not have timeout mechanism, so we're going to have to use the
 // special timer ActiveX object that came along with Internet Explorer and XHR.
 // TODO This needs to be called IScriptInjector. It uses the peculiar behavior
 // of IXMLHttpRequest, that of accepting an IDispatch interface objet as a
@@ -78,10 +79,8 @@ GetEngineName(LPCTSTR buffer, int length, LPCTSTR subKey)
     HKEY hk, hkSub;
     DWORD err, type = REG_SZ, size = length,
           read = KEY_QUERY_VALUE | KEY_READ;
-    Log(L"Get engine name!\n");
     if (!RegOpenKeyEx(HKEY_CLASSES_ROOT, buffer, 0, read, &hk))
     {
-        Log(L"%s\n", buffer);
         if (!RegOpenKeyEx(hk, L"CLSID", 0, read, &hkSub))
         {
             err = RegQueryValueExW(hkSub, 0, 0, &type, (LPBYTE) buffer, &size);
@@ -90,7 +89,6 @@ GetEngineName(LPCTSTR buffer, int length, LPCTSTR subKey)
         }
         else if (subKey)
         {
-            Log(L"HERE\n");
             if (!RegOpenKeyEx(hk, subKey, 0, read, &hkSub))
             {
                 err = RegQueryValueEx(hkSub, 0, 0, &type,
@@ -114,7 +112,6 @@ GetEngineGUID(LPCTSTR lpzExtension, GUID *guidBuffer)
     wchar_t buffer[256];
     DWORD type = REG_SZ, size, err, read = KEY_QUERY_VALUE | KEY_READ;
 
-    Log(L"HERE %s\n", lpzExtension);
     if (!RegOpenKeyEx(HKEY_CLASSES_ROOT, lpzExtension, 0, read, &hk))
     {
         size = sizeof(buffer);
@@ -124,10 +121,8 @@ GetEngineGUID(LPCTSTR lpzExtension, GUID *guidBuffer)
         {
             GetEngineName(buffer, sizeof(buffer), L"ScriptEngine");
         }
-        Log(L"As String %s.\n", buffer);
         if (!err)
         {
-            Log(L"Hey, lady!\n");
             return CLSIDFromString(buffer, guidBuffer);
         }
     }
@@ -138,102 +133,79 @@ static HRESULT
 OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
 {
     HRESULT hr;
+    GUID guidJavaScript;
     OnDocument *pOnDocument = (OnDocument *)pDispatch;
     IActiveScript *pActiveScript = NULL;
-    IActiveScriptSite *pActiveScriptSite = NULL;
     IActiveScriptParse *pActiveScriptParse = NULL;
-    GUID guidJavaScript;
-    ActiveScriptSite *pSite = NULL;
+    IActiveScriptSite *pActiveScriptSite = NULL;
+    IDispatch *pDocument = NULL;
+    IWebBrowser2* pBrowser = NULL;
+    IScriptContext *pScriptContext = NULL;
+    DWORD dwCount;
 
-    Log(L"bstrReferer: %s\n", bstrReferer);
-    Log(L"GUID TIME\n");
-    GetEngineGUID(L".js", &guidJavaScript);
-    Log(L"GUID GOT\n");
-    hr = CoCreateInstance(&guidJavaScript, 0, CLSCTX_ALL, &IID_IActiveScript, (LPVOID*)&pActiveScript);
-    Log(L"Success? %d %d\n", hr == REGDB_E_CLASSNOTREG, pActiveScript); 
+    hr = pDispatch->lpVtbl->QueryInterface(pDispatch, &IID_IWebBrowser2, &pBrowser);
+    IsOkay(hr, exit);
+    hr = pBrowser->lpVtbl->get_Document(pBrowser, &pDocument);
+    IsOkay(hr, exit);
 
-    pActiveScript->lpVtbl->QueryInterface(pActiveScript, &IID_IActiveScriptParse, &pActiveScriptParse);
+    hr = GetEngineGUID(L".js", &guidJavaScript);
+    IsOkay(hr, exit);
+    hr = CoCreateInstance(&guidJavaScript, 0, CLSCTX_ALL,
+            &IID_IActiveScript, (LPVOID*)&pActiveScript);
+    IsOkay(hr, exit);
 
-    pActiveScriptParse->lpVtbl->InitNew(pActiveScriptParse);
+    hr = pActiveScript->lpVtbl->QueryInterface(pActiveScript, &IID_IActiveScriptParse,
+            &pActiveScriptParse);
+    IsOkay(hr, exit);
 
-    hr = GenericFactory_CreateInstance(L"{73C6AB50-2BEE-4DC0-AB1C-910C255D1C23}", &IID_IActiveScriptSite, &pActiveScriptSite);
-    pSite = (ActiveScriptSite*) pActiveScriptSite;
-    pSite->pScriptContext->lpVtbl->SetURL((IScriptContext*)pSite->pScriptContext, bstrReferer);
+    hr = pActiveScriptParse->lpVtbl->InitNew(pActiveScriptParse);
+    IsOkay(hr, exit);
+
+    hr = GenericFactory_CreateInstance(L"{73C6AB50-2BEE-4DC0-AB1C-910C255D1C23}",
+            &IID_IActiveScriptSite, &pActiveScriptSite);
+    IsOkay(hr, exit);
+
+    pScriptContext = ((ActiveScriptSite*) pActiveScriptSite)->pScriptContext;
+    pScriptContext->lpVtbl->SetURL(pScriptContext, bstrReferer);
+    pScriptContext->lpVtbl->SetDocument(pScriptContext, pDocument);
     pActiveScript->lpVtbl->SetScriptSite(pActiveScript, pActiveScriptSite);
 
-    pActiveScript->lpVtbl->AddNamedItem(pActiveScript, L"verity", SCRIPTITEM_ISVISIBLE|SCRIPTITEM_NOCODE);
+    hr = pActiveScript->lpVtbl->AddNamedItem(pActiveScript, L"verity",
+            SCRIPTITEM_ISVISIBLE|SCRIPTITEM_NOCODE);
+    IsOkay(hr, exit);
 
-    pActiveScriptParse->lpVtbl->ParseScriptText(pActiveScriptParse, bstrSource, 0, 0, 0, 0, 0, 0, 0, 0);
-    pActiveScriptParse->lpVtbl->Release(pActiveScriptParse);
-    pActiveScriptParse = NULL;
+    hr = pActiveScriptParse->lpVtbl->ParseScriptText(pActiveScriptParse, bstrSource,
+            0, 0, 0, 0, 0, 0, 0, 0);
+    IsOkay(hr, exit);
 
-    pActiveScript->lpVtbl->SetScriptState(pActiveScript, SCRIPTSTATE_CONNECTED);
+    dwCount = pActiveScript->lpVtbl->AddRef(pActiveScript);
+    ((ScriptContext*)pScriptContext)->pActiveScript = pActiveScript;
+    Log(L"ActiveScript COUNT: %d\n", dwCount);
 
- /*   pActiveScript->lpVtbl->Close(pActiveScript);
-
+    hr = pActiveScript->lpVtbl->SetScriptState(pActiveScript, SCRIPTSTATE_CONNECTED);
+    IsOkay(hr, exit);
+exit:
     if (pActiveScriptParse)
     {
         pActiveScriptParse->lpVtbl->Release(pActiveScriptParse);
     }
-
+    if (pActiveScriptSite)
+    {
+        pActiveScriptSite->lpVtbl->Release(pActiveScriptSite);
+    }
     if (pActiveScript)
     {
         pActiveScript->lpVtbl->Release(pActiveScript);
-    }*/
-
+    }
+    if (pDocument)
+    {
+        pDocument->lpVtbl->Release(pDocument);
+    }
+    if (pBrowser)
+    {
+        pBrowser->lpVtbl->Release(pBrowser);
+    }
     return hr;
-}
-
-static HRESULT
-ExecTest(IWebBrowser2* pBrowser)
-{
-    HRESULT err;
-    IHTMLDocument2* pDoc;
-    IHTMLWindow2*   pWindow;
-    IDispatch*      pDispatch;
-    
-    BSTR            script = NULL, type = NULL;
-
-    VARIANT         v;
-    
-    VariantInit(&v);
-    v.vt = VT_EMPTY;
-
-    err = pBrowser->lpVtbl->get_Document(pBrowser, &pDispatch);
-    IsOkay(err, releaseBrowser); 
-
-    err = pDispatch->lpVtbl->QueryInterface(pDispatch, &IID_IHTMLDocument2, &pDoc);
-    IsOkay(err, releaseBrowser);
-
-    err = pDoc->lpVtbl->get_parentWindow(pDoc, &pWindow);
-    IsOkay(err, releaseDoc);
-
-    script = SysAllocString(_T("alert('Hello, World!');"));
-    type = SysAllocString(_T("javascript"));
-
-    if (script && type)
-    {
-        err = pWindow->lpVtbl->execScript(pWindow, script, type, &v);
-        if (err == E_INVALIDARG)
-        {
-            Log(_T("Invalid arg.\n"));
-        }
-    }
-
-    if (script)
-    {
-        SysFreeString(script);
-    }
-    if (type)
-    {
-        SysFreeString(type);
-    }
-    Log(_T("IDispatch::Invoke Got Document. %d\n"), err);
-releaseDoc:
-    pDoc->lpVtbl->Release(pDoc);
-releaseBrowser:
-    pBrowser->lpVtbl->Release(pBrowser);
-    return err;
 }
         
 static HRESULT STDMETHODCALLTYPE
@@ -291,6 +263,7 @@ OnDocument_CreateInstance(REFIID guidVtbl, void **ppv)
         // Set the virtual function table and reference count.
         pOnDocument->lpVtbl = &OnDocumentVtbl;
         pOnDocument->dwCount = 1;
+        pOnDocument->pActiveScript = NULL;
 
         // Increment the library lock count.
         InterlockedIncrement(pdwLockCount);

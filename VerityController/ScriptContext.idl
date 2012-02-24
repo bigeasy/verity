@@ -11,16 +11,22 @@ library IScriptContext
         [id(1), propput] HRESULT url([in] BSTR bstr);
         [helpstring("Gets a string from a cubbyhole.")] 
         [id(1), propget] HRESULT url([out, retval] BSTR *pbstr);
-        [helpstring("Get the injections JSON string.")]
-        [id(2), propput] HRESULT injections([in] BSTR bstrInjections);
-        [helpstring("Create an XMLHttpRequest.")]
-        [id(2), propget] HRESULT injections([out, retval] BSTR *pbstrInjections);
         [helpstring("Set the injections JSON string.")]
-        [id(3)] HRESULT createXHR([out, retval] IDispatch **ppDispatch);
+        [id(2), propput] HRESULT injections([in] BSTR bstrInjections);
+        [helpstring("Get the injections JSON string.")]
+        [id(2), propget] HRESULT injections([out, retval] BSTR *pbstrInjections);
+        [helpstring("Set the HTML document string.")]
+        [id(3), propput] HRESULT document([in] IDispatch *pDispatch);
+        [helpstring("Get the HTML document string.")]
+        [id(3), propget] HRESULT document([out, retval] IDispatch **ppDispatch);
+        [helpstring("Create an XHR.")]
+        [id(4)] HRESULT createXHR([out, retval] IDispatch **ppDispatch);
         [helpstring("Inject generated script into browser.")]
-        [id(4)] HRESULT injector([in] BSTR bstrInjection);
+        [id(5)] HRESULT injector([in] BSTR bstrInjection);
+        [helpstring("Send message to output log.")]
+        [id(7)] HRESULT log([in] BSTR message);
         [helpstring("Create a diagnostic object used to track object ownership.")]
-        [id(5)] HRESULT createObservable([out, retval] IDispatch **pDispatch);
+        [id(8)] HRESULT createObservable([out, retval] IDispatch **pDispatch);
     }
 
     [uuid(7CD57D42-C553-4B82-A52A-513082F57EE0),
