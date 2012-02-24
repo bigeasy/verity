@@ -18,7 +18,6 @@ Interface ## _QueryInterface                                  \
     }                                                       \
     else                                                    \
     {                                                       \
-        Log(L"NO INTERFACE\n"); \
         *ppv = NULL;                                        \
         return E_NOINTERFACE;                               \
     }                                                       \

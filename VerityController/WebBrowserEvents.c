@@ -199,7 +199,10 @@ OnDocumentComplete(IDispatch* pDispatch, BSTR bstrReferer)
     GUID guidJavaScript;
     ActiveScriptSite *pSite = NULL;
 
+    Log(L"bstrReferer: %s\n", bstrReferer);
+    Log(L"GUID TIME\n");
     GetEngineGUID(L".js", &guidJavaScript);
+    Log(L"GUID GOT\n");
     hr = CoCreateInstance(&guidJavaScript, 0, CLSCTX_ALL, &IID_IActiveScript, (LPVOID*)&pActiveScript);
     Log(L"Success? %d %d\n", hr == REGDB_E_CLASSNOTREG, pActiveScript); 
 
@@ -375,15 +378,16 @@ IDispatch_Invoke(
     UINT *puArgErr
 ) {
     HRESULT err = S_OK;
-    if (dispIdMember == DISPID_DOCUMENTCOMPLETE) {
+    if (dispIdMember == DISPID_NAVIGATECOMPLETE2) {
         // Parameters are passed in the opposite order of the documentation.
         // The IDispatch pointer is in the first argument of two arguments,
         // therefore it is the last argument here. The IDispatch pointer is
         // inside a VARIANT, so we need to go from the argument variant,
         // through a variant to get to our IDispatch.
         Log(_T("Document HOOOKED! %d\n"), GetCurrentThreadId());
+        Log(L"Called: %d\n", pDispParams->cArgs);
         err = OnDocumentComplete(pDispParams->rgvarg[1].pvarVal->pdispVal,
-                                 pDispParams->rgvarg[0].bstrVal);
+            pDispParams->rgvarg[0].pvarVal->bstrVal);
     }
     return err;
 }

@@ -170,6 +170,7 @@ static HRESULT STDMETHODCALLTYPE
 IScriptContext_SetURL (IScriptContext *pSelf, BSTR bstrURL)
 {
     ScriptContext *pScriptContext = (ScriptContext *) pSelf;
+    Log(L"SetURL %s\n", bstrURL);
     if (pScriptContext->bstrURL)
     {
         SysFreeString(pScriptContext->bstrURL);
@@ -197,12 +198,14 @@ IScriptContext_GetURL (IScriptContext *pSelf, BSTR *pbstrURL)
     {
         *pbstrURL = NULL;
     }
+    Log(L"GetURL %s\n", *pbstrURL);
     return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE
 IScriptContext_SetInjections (IScriptContext *pSelf, BSTR bstrInjections)
 {
+    Log(L"SetInjections %s\n", bstrInjections);
     EnterCriticalSection(&InjectionMap.csInjections);
     if (InjectionMap.bstrInjections)
     {
@@ -233,6 +236,7 @@ IScriptContext_GetInjections (IScriptContext *pSelf, BSTR *pbstrInjections)
         *pbstrInjections = NULL;
     }
     LeaveCriticalSection(&InjectionMap.csInjections);
+    Log(L"GetURL %s\n", *pbstrInjections);
     return S_OK;
 }
 
@@ -243,6 +247,7 @@ IScriptContext_GetInjections (IScriptContext *pSelf, BSTR *pbstrInjections)
 static HRESULT STDMETHODCALLTYPE
 IScriptContext_CreateXHR (IScriptContext *pSelf, IDispatch** ppIDispatch)
 {
+    Log(L"CreateXHR.\n");
     return CoCreateInstance(&CLSID_XMLHTTPRequest, NULL, CLSCTX_INPROC_SERVER,
         &IID_IDispatch, ppIDispatch);
 }
@@ -250,6 +255,7 @@ IScriptContext_CreateXHR (IScriptContext *pSelf, IDispatch** ppIDispatch)
 static HRESULT STDMETHODCALLTYPE
 IScriptContext_Injector (IScriptContext *pSelf, BSTR bstrInjector)
 {
+    Log(L"Injector.\n");
     return S_OK;
 }
 

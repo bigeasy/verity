@@ -61,8 +61,6 @@ IClassFactory_CreateInstance(
     {
         hr = pFactory->constructor(guidVtbl, ppv);
     }
-
-    Log(_T("Allocated: %d\n"), hr);
     return hr;
 }
 
