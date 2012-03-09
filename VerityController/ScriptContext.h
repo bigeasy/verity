@@ -32,17 +32,9 @@ DECLARE_INTERFACE_ (INTERFACE, IDispatch)
 
 struct ScriptContext;
 
-typedef struct ProvideMultipleClassInfo
-{
-    IProvideMultipleClassInfoVtbl *lpVtbl;
-    IScriptContext *pScriptContext;
-}
-ProvideMultipleClassInfo;
-
 typedef struct ScriptContext
 {
     IScriptContextVtbl *lpVtbl;
-    ProvideMultipleClassInfo PMCI;
     DWORD dwCount;
     BSTR bstrURL;
     IDispatch *pDocument;

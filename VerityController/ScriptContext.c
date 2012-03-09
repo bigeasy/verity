@@ -44,6 +44,7 @@ static REFIID ariidImplemented[] =
 
 REFERENCE_COUNT(IScriptContext, ScriptContext, pdwLockCount, NO_DESTRUCTOR)
 
+/* FIXME: Now use our common QUERY_INTERFACE. */
 static HRESULT STDMETHODCALLTYPE
 IScriptContext_QueryInterface(IScriptContext *pSelf, REFIID riid, void **ppv)
 {
@@ -51,12 +52,6 @@ IScriptContext_QueryInterface(IScriptContext *pSelf, REFIID riid, void **ppv)
     if (IsIIDImplemented(riid, ariidImplemented))
     {
         *ppv = pSelf;
-        pSelf->lpVtbl->AddRef(pSelf);
-        return S_OK;
-    }
-    else if (IsEqualIID(riid, &IID_IProvideMultipleClassInfo))
-    {
-        *ppv = &pScriptContext->PMCI;
         pSelf->lpVtbl->AddRef(pSelf);
         return S_OK;
     }
@@ -333,64 +328,6 @@ IScriptContextVtbl ScriptContextVtbl =
     IScriptContext_CreateObservable
 };
 
-static HRESULT STDMETHODCALLTYPE
-IProvideMultipleClassInfo_QueryInterface(IProvideMultipleClassInfo *pSelf, REFIID riid, void **ppv)
-{
-    ProvideMultipleClassInfo *pPMCI = (ProvideMultipleClassInfo*) pSelf;
-    return IScriptContext_QueryInterface(pPMCI->pScriptContext, riid, ppv);
-}
-
-static ULONG STDMETHODCALLTYPE
-IProvideMultipleClassInfo_AddRef(IProvideMultipleClassInfo *pSelf)
-{
-    ProvideMultipleClassInfo *pPMCI = (ProvideMultipleClassInfo*) pSelf;
-    return IScriptContext_AddRef(pPMCI->pScriptContext);
-}
-
-static ULONG STDMETHODCALLTYPE
-IProvideMultipleClassInfo_Release(IProvideMultipleClassInfo *pSelf)
-{
-    ProvideMultipleClassInfo *pPMCI = (ProvideMultipleClassInfo*) pSelf;
-    return IScriptContext_Release(pPMCI->pScriptContext);
-}
-
-static HRESULT STDMETHODCALLTYPE
-IProvideMultipleClassInfo_GetClassInfo (IProvideMultipleClassInfo *pSelf, ITypeInfo **ppTI)
-{
-    return S_OK;
-}
-        
-static HRESULT STDMETHODCALLTYPE
-IProvideMultipleClassInfo_GetGUID (IProvideMultipleClassInfo *pSelf, DWORD dwGuidKind, GUID *pGUID)
-{
-    return S_OK;
-}
-        
-static HRESULT STDMETHODCALLTYPE
-IProvideMultipleClassInfo_GetMultiTypeInfoCount (IProvideMultipleClassInfo *pSelf, ULONG *pcti)
-{
-    return S_OK;
-}
-        
-static HRESULT STDMETHODCALLTYPE
-IProvideMultipleClassInfo_GetInfoOfIndex (IProvideMultipleClassInfo * pSelf, ULONG iti, DWORD dwFlags,
-        ITypeInfo **pptiCoClass, DWORD *pdwTIFlags, ULONG *pcdispidReserved,
-        IID *piidPrimary, IID *piidSource)
-{
-    return S_OK;
-}
-
-IProvideMultipleClassInfoVtbl ProvideMultipleClassInfoVtbl =
-{
-    IProvideMultipleClassInfo_QueryInterface,
-    IProvideMultipleClassInfo_AddRef,
-    IProvideMultipleClassInfo_Release,
-    IProvideMultipleClassInfo_GetClassInfo,
-    IProvideMultipleClassInfo_GetGUID,
-    IProvideMultipleClassInfo_GetMultiTypeInfoCount,
-    IProvideMultipleClassInfo_GetInfoOfIndex
-};
-
 // Create an instance of the Verity browser helper object.
 static HRESULT
 ScriptContext_CreateInstance(
@@ -408,8 +345,6 @@ ScriptContext_CreateInstance(
     {
         // Set the virtual function table and reference count.
         pScriptContext->lpVtbl = &ScriptContextVtbl;
-        pScriptContext->PMCI.lpVtbl = &ProvideMultipleClassInfoVtbl;
-        pScriptContext->PMCI.pScriptContext = (IScriptContext*) pScriptContext;
         pScriptContext->dwCount = 1;
         pScriptContext->bstrURL = NULL;
         pScriptContext->pDocument = NULL;
