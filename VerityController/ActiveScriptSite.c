@@ -68,6 +68,7 @@ static HRESULT STDMETHODCALLTYPE
 IActiveScriptSite_OnScriptTerminate(
     IActiveScriptSite *pSelf, const VARIANT *pvarResult, const EXCEPINFO *pexcepinfo
 ) {
+    Log(L"TERMINATE SCRIPT\n");
     return S_OK;
 }
         

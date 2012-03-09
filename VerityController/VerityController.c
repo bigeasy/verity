@@ -22,7 +22,6 @@
 #include "Log.h"
 #include "Jumps.h"
 #include "VerityController.h"
-#include "WebBrowserEvents.h"
 #include "ComponentObjectModel.h"
 #include "GenericFactory.h"
 
