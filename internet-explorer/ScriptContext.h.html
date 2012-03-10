@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ScriptContext.h</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+  <table cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th class="docs"><h1>ScriptContext.h</th>
+        <th class="code"></th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="docs"><p>{7CD57D42-C553-4B82-A52A-513082F57EE0} </p></td>
+          <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="n">DEFINE_GUID</span><span class="p">(</span><span class="n">CLSID_ScriptContext</span><span class="p">,</span> <span class="mh">0x7cd57d42</span><span class="p">,</span> <span class="mh">0xc553</span><span class="p">,</span> <span class="mh">0x4b82</span><span class="p">,</span> <span class="mh">0xa5</span><span class="p">,</span> <span class="mh">0x2a</span><span class="p">,</span> <span class="mh">0x51</span><span class="p">,</span> <span class="mh">0x30</span><span class="p">,</span> <span class="mh">0x82</span><span class="p">,</span> <span class="mh">0xf5</span><span class="p">,</span> <span class="mh">0x7e</span><span class="p">,</span> <span class="mh">0xe0</span><span class="p">);</span>
+
+<span class="cp">#undef  INTERFACE</span>
+<span class="cp">#define INTERFACE IScriptContext</span>
+<span class="n">DECLARE_INTERFACE_</span> <span class="p">(</span><span class="n">INTERFACE</span><span class="p">,</span> <span class="n">IDispatch</span><span class="p">)</span>
+<span class="p">{</span>
+   <span class="c1">// IUnknown functions</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">QueryInterface</span><span class="p">)</span>         <span class="p">(</span><span class="n">THIS_</span> <span class="n">REFIID</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD_</span> <span class="p">(</span><span class="n">ULONG</span><span class="p">,</span> <span class="n">AddRef</span><span class="p">)</span>          <span class="p">(</span><span class="n">THIS</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD_</span> <span class="p">(</span><span class="n">ULONG</span><span class="p">,</span> <span class="n">Release</span><span class="p">)</span>         <span class="p">(</span><span class="n">THIS</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="c1">// IDispatch functions</span>
+   <span class="n">STDMETHOD_</span> <span class="p">(</span><span class="n">ULONG</span><span class="p">,</span> <span class="n">GetTypeInfoCount</span><span class="p">)(</span><span class="n">THIS_</span> <span class="n">UINT</span> <span class="o">*</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD_</span> <span class="p">(</span><span class="n">ULONG</span><span class="p">,</span> <span class="n">GetTypeInfo</span><span class="p">)</span>     <span class="p">(</span><span class="n">THIS_</span> <span class="n">UINT</span><span class="p">,</span> <span class="n">LCID</span><span class="p">,</span> <span class="n">ITypeInfo</span> <span class="o">**</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD_</span> <span class="p">(</span><span class="n">ULONG</span><span class="p">,</span> <span class="n">GetIDsOfNames</span><span class="p">)</span>   <span class="p">(</span><span class="n">THIS_</span> <span class="n">REFIID</span><span class="p">,</span> <span class="n">LPOLESTR</span> <span class="o">*</span><span class="p">,</span> 
+                                        <span class="n">UINT</span><span class="p">,</span> <span class="n">LCID</span><span class="p">,</span> <span class="n">DISPID</span> <span class="o">*</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD_</span> <span class="p">(</span><span class="n">ULONG</span><span class="p">,</span> <span class="n">Invoke</span><span class="p">)</span>          <span class="p">(</span><span class="n">THIS_</span> <span class="n">DISPID</span><span class="p">,</span> <span class="n">REFIID</span><span class="p">,</span> 
+                                        <span class="n">LCID</span><span class="p">,</span> <span class="n">WORD</span><span class="p">,</span> <span class="n">DISPPARAMS</span> <span class="o">*</span><span class="p">,</span>
+                                        <span class="n">VARIANT</span> <span class="o">*</span><span class="p">,</span> <span class="n">EXCEPINFO</span> <span class="o">*</span><span class="p">,</span> <span class="n">UINT</span> <span class="o">*</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="c1">// Extra functions</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">SetURL</span><span class="p">)</span>                 <span class="p">(</span><span class="n">THIS_</span> <span class="n">BSTR</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">GetURL</span><span class="p">)</span>                 <span class="p">(</span><span class="n">THIS_</span> <span class="n">BSTR</span><span class="o">*</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">SetInjections</span><span class="p">)</span>          <span class="p">(</span><span class="n">THIS_</span> <span class="n">BSTR</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">GetInjections</span><span class="p">)</span>          <span class="p">(</span><span class="n">THIS_</span> <span class="n">BSTR</span><span class="o">*</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">SetDocument</span><span class="p">)</span>            <span class="p">(</span><span class="n">THIS_</span> <span class="n">IDispatch</span><span class="o">*</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">GetDocument</span><span class="p">)</span>            <span class="p">(</span><span class="n">THIS_</span> <span class="n">IDispatch</span><span class="o">**</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">CreateXHR</span><span class="p">)</span>              <span class="p">(</span><span class="n">THIS_</span> <span class="n">IDispatch</span><span class="o">**</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">Injector</span><span class="p">)</span>               <span class="p">(</span><span class="n">THIS_</span> <span class="n">BSTR</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">Log</span><span class="p">)</span>                    <span class="p">(</span><span class="n">THIS_</span> <span class="n">BSTR</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+   <span class="n">STDMETHOD</span>  <span class="p">(</span><span class="n">CreateObservable</span><span class="p">)</span>       <span class="p">(</span><span class="n">THIS_</span> <span class="n">IDispatch</span><span class="o">**</span><span class="p">)</span> <span class="n">PURE</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">struct</span> <span class="n">ScriptContext</span><span class="p">;</span>
+
+<span class="k">typedef</span> <span class="k">struct</span> <span class="n">ScriptContext</span>
+<span class="p">{</span>
+    <span class="n">IScriptContextVtbl</span> <span class="o">*</span><span class="n">lpVtbl</span><span class="p">;</span>
+    <span class="n">DWORD</span> <span class="n">dwCount</span><span class="p">;</span>
+    <span class="n">BSTR</span> <span class="n">bstrURL</span><span class="p">;</span>
+    <span class="n">IDispatch</span> <span class="o">*</span><span class="n">pDocument</span><span class="p">;</span>
+    <span class="n">IActiveScript</span> <span class="o">*</span><span class="n">pActiveScript</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="n">ScriptContext</span><span class="p">;</span>
+</pre></div>
+</pre></div></td>
+        </tr>
+      
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

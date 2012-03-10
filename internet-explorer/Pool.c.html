@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Pool.c</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+  <table cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th class="docs"><h1>Pool.c</th>
+        <th class="code"></th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="cp">#include &quot;stdafx.h&quot;</span>
+<span class="cp">#include &quot;Pool.h&quot;</span>
+
+<span class="cp">#define POOL_SIZE 128</span>
+<span class="cp">#define STRING_HEAP 0</span>
+<span class="cp">#define MEMORY_HEAP 0</span>
+
+
+<span class="k">typedef</span> <span class="k">struct</span> <span class="n">CListPool</span> <span class="n">LISTPOOL</span><span class="p">;</span>
+<span class="k">typedef</span> <span class="k">struct</span> <span class="n">CListPool</span> <span class="p">{</span>
+    <span class="n">LISTPOOL</span><span class="o">*</span>   <span class="n">pPrevious</span><span class="p">;</span>
+    <span class="n">WORD</span>        <span class="n">wNextNode</span><span class="p">;</span> 
+    <span class="n">LISTNODE</span>    <span class="n">aln</span><span class="p">[</span><span class="n">POOL_SIZE</span><span class="p">];</span>
+<span class="p">}</span> <span class="n">LISTPOOL</span><span class="p">;</span>
+
+<span class="n">HANDLE</span>
+<span class="nf">PoolAllocPool</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="n">LISTPOOL</span><span class="o">*</span> <span class="n">pListPool</span> <span class="o">=</span> <span class="n">GlobalAlloc</span><span class="p">(</span><span class="n">GMEM_FIXED</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">LISTPOOL</span><span class="p">));</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pListPool</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">pPrevious</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">wNextNode</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">pvValue</span> <span class="o">=</span>
+        <span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pvValue</span> <span class="o">=</span>
+        <span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">pvValue</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">pListPool</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">LISTNODE</span><span class="o">*</span>
+<span class="nf">PoolAllocNode</span><span class="p">(</span><span class="n">HANDLE</span> <span class="n">hList</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNode</span><span class="p">;</span>
+    <span class="n">LISTPOOL</span><span class="o">*</span> <span class="n">pNextPool</span><span class="p">;</span>
+    <span class="n">LISTPOOL</span><span class="o">*</span> <span class="n">pListPool</span> <span class="o">=</span> <span class="p">(</span><span class="n">LISTPOOL</span><span class="o">*</span><span class="p">)</span> <span class="n">hList</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">wNextNode</span> <span class="o">==</span> <span class="n">POOL_SIZE</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">pNextPool</span> <span class="o">=</span> <span class="n">PoolAllocPool</span><span class="p">();</span>    
+        <span class="k">if</span> <span class="p">(</span><span class="n">pNextPool</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="n">pNextPool</span><span class="o">-&gt;</span><span class="n">pPrevious</span> <span class="o">=</span> <span class="n">pListPool</span><span class="p">;</span>
+        <span class="n">pListPool</span> <span class="o">=</span> <span class="n">pNextPool</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">pNode</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">wNextNode</span><span class="o">++</span><span class="p">];</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pvValue</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pNext</span> <span class="o">=</span> <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pPrevious</span> <span class="o">=</span> <span class="n">pNode</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">pNode</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">LISTPOOL</span><span class="o">*</span>
+<span class="nf">GetPoolHead</span><span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">LISTPOOL</span><span class="o">*</span> <span class="n">pListPool</span> <span class="o">=</span> <span class="p">(</span><span class="n">LISTPOOL</span><span class="o">*</span><span class="p">)</span> <span class="n">hListPool</span><span class="p">;</span>
+    <span class="k">while</span> <span class="p">(</span><span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">pPrevious</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pListPool</span> <span class="o">=</span> <span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">pPrevious</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">pListPool</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">BSTR</span>
+<span class="nf">PoolAllocStringBytes</span><span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">,</span> <span class="n">UINT</span> <span class="n">uiBytes</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">BSTR</span> <span class="n">bstr</span><span class="p">;</span>
+    <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNext</span> <span class="o">=</span> <span class="n">PoolAllocNode</span><span class="p">(</span><span class="n">hListPool</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pNext</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">bstr</span> <span class="o">=</span> <span class="n">SysAllocStringByteLen</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="n">uiBytes</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">bstr</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pvValue</span> <span class="o">=</span> <span class="n">bstr</span><span class="p">;</span>
+    <span class="n">PoolLinkAfter</span><span class="p">(</span><span class="n">pNext</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">GetPoolHead</span><span class="p">(</span><span class="n">hListPool</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="n">STRING_HEAP</span><span class="p">]);</span>
+    <span class="k">return</span> <span class="n">bstr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">BSTR</span>
+<span class="nf">PoolAllocString</span><span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">,</span> <span class="n">TCHAR</span><span class="o">*</span> <span class="n">tstr</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">BSTR</span> <span class="n">bstr</span><span class="p">;</span>
+    <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNext</span> <span class="o">=</span> <span class="n">PoolAllocNode</span><span class="p">(</span><span class="n">hListPool</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pNext</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">bstr</span> <span class="o">=</span> <span class="n">SysAllocString</span><span class="p">(</span><span class="n">tstr</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">bstr</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pvValue</span> <span class="o">=</span> <span class="n">bstr</span><span class="p">;</span>
+    <span class="n">PoolLinkAfter</span><span class="p">(</span><span class="n">pNext</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">GetPoolHead</span><span class="p">(</span><span class="n">hListPool</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="n">STRING_HEAP</span><span class="p">]);</span>
+    <span class="k">return</span> <span class="n">bstr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">BSTR</span>
+<span class="nf">PoolAppendString</span><span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">,</span> <span class="n">BSTR</span> <span class="n">string</span><span class="p">,</span> <span class="n">BSTR</span> <span class="n">append</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">UINT</span> <span class="n">combinedLength</span><span class="p">,</span> <span class="n">baseBytes</span><span class="p">,</span> <span class="n">appendBytes</span><span class="p">;</span>
+    <span class="n">BSTR</span> <span class="n">dest</span><span class="p">;</span>
+    <span class="n">baseBytes</span> <span class="o">=</span> <span class="n">SysStringByteLen</span><span class="p">(</span><span class="n">string</span><span class="p">);</span>       
+    <span class="n">appendBytes</span> <span class="o">=</span> <span class="n">SysStringByteLen</span><span class="p">(</span><span class="n">string</span><span class="p">);</span>   
+    <span class="n">combinedLength</span> <span class="o">=</span> <span class="n">wcslen</span><span class="p">(</span><span class="n">string</span><span class="p">)</span> <span class="o">+</span> <span class="n">wcslen</span><span class="p">(</span><span class="n">append</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">combinedLength</span> <span class="o">&gt;</span> <span class="n">baseBytes</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">dest</span> <span class="o">=</span> <span class="n">PoolAllocStringBytes</span><span class="p">(</span><span class="n">hListPool</span><span class="p">,</span> <span class="n">combinedLength</span> <span class="o">*</span> <span class="mi">2</span><span class="p">);</span>
+        <span class="n">wcscat_s</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="n">combinedLength</span><span class="p">,</span> <span class="n">string</span><span class="p">);</span>
+    <span class="p">}</span> 
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="n">dest</span> <span class="o">=</span> <span class="n">string</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">wcscat_s</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="n">combinedLength</span><span class="p">,</span> <span class="n">append</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">dest</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">LPVOID</span>
+<span class="nf">PoolAllocMemory</span><span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">,</span> <span class="n">SIZE_T</span> <span class="n">sSize</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">LPVOID</span> <span class="n">pMemory</span><span class="p">;</span>
+    <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNext</span> <span class="o">=</span> <span class="n">PoolAllocNode</span><span class="p">(</span><span class="n">hListPool</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pNext</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">pMemory</span> <span class="o">=</span> <span class="n">GlobalAlloc</span><span class="p">(</span><span class="n">GMEM_FIXED</span><span class="p">,</span> <span class="n">sSize</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pMemory</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pvValue</span> <span class="o">=</span> <span class="n">pMemory</span><span class="p">;</span>
+    <span class="n">PoolLinkAfter</span><span class="p">(</span><span class="n">pNext</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">GetPoolHead</span><span class="p">(</span><span class="n">hListPool</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="n">STRING_HEAP</span><span class="p">]);</span>
+    <span class="k">return</span> <span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pvValue</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">HRESULT</span>
+<span class="nf">PoolCoCreateInstance</span><span class="p">(</span>
+    <span class="n">HANDLE</span> <span class="n">hPool</span><span class="p">,</span> <span class="n">REFCLSID</span> <span class="n">rclsid</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">riid</span><span class="p">,</span> <span class="n">LPVOID</span><span class="o">*</span> <span class="n">ppv</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">err</span> <span class="o">=</span> <span class="n">S_FALSE</span><span class="p">;</span>
+    <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNext</span> <span class="o">=</span> <span class="n">PoolAllocNode</span><span class="p">(</span><span class="n">hPool</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pNext</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">CoCreateInstance</span><span class="p">(</span><span class="n">rclsid</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">CLSCTX_INPROC</span><span class="p">,</span> <span class="n">riid</span><span class="p">,</span> <span class="n">ppv</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">err</span> <span class="o">==</span> <span class="n">S_OK</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pvValue</span> <span class="o">=</span> <span class="o">*</span><span class="n">ppv</span><span class="p">;</span>
+            <span class="n">PoolLinkAfter</span><span class="p">(</span><span class="n">pNext</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">GetPoolHead</span><span class="p">(</span><span class="n">hPool</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">err</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">HRESULT</span>
+<span class="nf">PoolQueryInterface</span><span class="p">(</span>
+    <span class="n">HANDLE</span> <span class="n">hPool</span><span class="p">,</span> <span class="n">LPVOID</span> <span class="n">pInstance</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="n">ppv</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">err</span>     <span class="o">=</span> <span class="n">S_FALSE</span><span class="p">;</span>
+    <span class="n">IUnknown</span> <span class="o">*</span><span class="n">pSelf</span> <span class="o">=</span> <span class="p">(</span><span class="n">IUnknown</span><span class="o">*</span><span class="p">)</span> <span class="n">pInstance</span><span class="p">;</span>
+    <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNext</span> <span class="o">=</span> <span class="n">PoolAllocNode</span><span class="p">(</span><span class="n">hPool</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pNext</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">pSelf</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">QueryInterface</span><span class="p">(</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="n">ppv</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">err</span> <span class="o">==</span> <span class="n">S_OK</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pvValue</span> <span class="o">=</span> <span class="o">*</span><span class="n">ppv</span><span class="p">;</span>
+            <span class="n">PoolLinkAfter</span><span class="p">(</span><span class="n">pNext</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">GetPoolHead</span><span class="p">(</span><span class="n">hPool</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">err</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">LISTNODE</span><span class="o">*</span>
+<span class="nf">PoolLinkAfter</span><span class="p">(</span><span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNode</span><span class="p">,</span> <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pAfter</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pNext</span> <span class="o">=</span> <span class="n">pAfter</span><span class="o">-&gt;</span><span class="n">pNext</span><span class="p">;</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pPrevious</span> <span class="o">=</span> <span class="n">pAfter</span><span class="p">;</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pPrevious</span> <span class="o">=</span> <span class="n">pNode</span><span class="p">;</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pPrevious</span><span class="o">-&gt;</span><span class="n">pNext</span> <span class="o">=</span> <span class="n">pNode</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">pNode</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">LISTNODE</span><span class="o">*</span>
+<span class="nf">PoolLinkBefore</span><span class="p">(</span><span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNode</span><span class="p">,</span> <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pBefore</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pPrevious</span> <span class="o">=</span> <span class="n">pBefore</span><span class="o">-&gt;</span><span class="n">pPrevious</span><span class="p">;</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pNext</span> <span class="o">=</span> <span class="n">pBefore</span><span class="p">;</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pPrevious</span> <span class="o">=</span> <span class="n">pNode</span><span class="p">;</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pPrevious</span><span class="o">-&gt;</span><span class="n">pNext</span> <span class="o">=</span> <span class="n">pNode</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">pNode</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">LISTNODE</span><span class="o">*</span>
+<span class="nf">PoolUnlink</span><span class="p">(</span><span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNode</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pPrevious</span><span class="o">-&gt;</span><span class="n">pNext</span> <span class="o">=</span> <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pNext</span><span class="p">;</span>
+    <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pPrevious</span> <span class="o">=</span> <span class="n">pNode</span><span class="o">-&gt;</span><span class="n">pPrevious</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">pNode</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span>
+<span class="nf">PoolFreePool</span><span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pIterator</span><span class="p">;</span>
+    <span class="n">LISTPOOL</span><span class="o">*</span> <span class="n">pListPool</span><span class="p">,</span> <span class="o">*</span><span class="n">pNextPool</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hListPool</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pIterator</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">GetPoolHead</span><span class="p">(</span><span class="n">hListPool</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="n">STRING_HEAP</span><span class="p">];</span>
+        <span class="k">while</span> <span class="p">(</span><span class="n">pIterator</span><span class="o">-&gt;</span><span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pvValue</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">pIterator</span> <span class="o">=</span> <span class="n">pIterator</span><span class="o">-&gt;</span><span class="n">pNext</span><span class="p">;</span>
+            <span class="n">SysFreeString</span><span class="p">((</span><span class="n">BSTR</span><span class="p">)</span> <span class="n">pIterator</span><span class="o">-&gt;</span><span class="n">pvValue</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="n">pIterator</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">GetPoolHead</span><span class="p">(</span><span class="n">hListPool</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">aln</span><span class="p">[</span><span class="n">MEMORY_HEAP</span><span class="p">];</span>
+        <span class="k">while</span> <span class="p">(</span><span class="n">pIterator</span><span class="o">-&gt;</span><span class="n">pNext</span><span class="o">-&gt;</span><span class="n">pvValue</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">pIterator</span> <span class="o">=</span> <span class="n">pIterator</span><span class="o">-&gt;</span><span class="n">pNext</span><span class="p">;</span>
+            <span class="n">GlobalFree</span><span class="p">(</span><span class="n">pIterator</span><span class="o">-&gt;</span><span class="n">pvValue</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="n">pListPool</span> <span class="o">=</span> <span class="p">(</span><span class="n">LISTPOOL</span> <span class="o">*</span><span class="p">)</span> <span class="n">hListPool</span><span class="p">;</span>
+        <span class="k">do</span>
+        <span class="p">{</span>
+            <span class="n">pNextPool</span> <span class="o">=</span> <span class="n">pListPool</span><span class="o">-&gt;</span><span class="n">pPrevious</span><span class="p">;</span>
+            <span class="n">GlobalFree</span><span class="p">((</span><span class="n">HGLOBAL</span><span class="p">)</span> <span class="n">pNextPool</span><span class="p">);</span>
+            <span class="n">pListPool</span> <span class="o">=</span> <span class="n">pNextPool</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="k">while</span> <span class="p">(</span><span class="n">pListPool</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</pre></div></td>
+        </tr>
+      
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

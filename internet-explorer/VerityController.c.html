@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>VerityController.c</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+  <table cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th class="docs"><h1>VerityController.c</th>
+        <th class="code"></th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="c1">// Implementation of the Verity controller Browser Helper Object.</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>A Browser Helper Object is an implemention of the <code>IObjectWithSite</code>
+interface. Once registered, an instance of this object is created by Internet
+Explorer when it creates a new browser window or tab. The <code>SetSite</code> method is
+invoked, passing in the browser object which implements the <code>IWebBrowser2</code>
+interface. Using the <code>IWebBrowser2</code> interface, we can set callbacks to fire
+when pages are loaded. </p>
+
+<p>That is the essence of our application, to load tests when a page loads.</p>
+
+<p>The first three methods implement the IUnknown interface, which is the
+interface implemented by all COM objects. We use the IUnknown interface
+to manage the object lifecycle (reference counting), and to get pointers
+to other interfaces via QueryInterface.</p></td>
+          <td class="code"><div class="highlight"><pre>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>System includes are in the precompiled header file. </p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="cp">#include &quot;stdafx.h&quot;</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Local includes. </p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="cp">#include &quot;Log.h&quot;</span>
+<span class="cp">#include &quot;Jumps.h&quot;</span>
+<span class="cp">#include &quot;VerityController.h&quot;</span>
+<span class="cp">#include &quot;ComponentObjectModel.h&quot;</span>
+<span class="cp">#include &quot;GenericFactory.h&quot;</span>
+
+<span class="k">static</span> <span class="n">DWORD</span> <span class="o">*</span><span class="n">pdwLockCount</span><span class="p">;</span>
+
+<span class="cp">#pragma once</span>
+<span class="c1">// The Verity browser helper object data.</span>
+<span class="k">typedef</span> <span class="k">struct</span> <span class="n">ObjectWithSite</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="n">IObjectWithSiteVtbl</span><span class="o">*</span> <span class="n">lpVtbl</span><span class="p">;</span>
+    <span class="n">DWORD</span>               <span class="n">dwCount</span><span class="p">;</span>
+    <span class="n">IConnectionPoint</span><span class="o">*</span>   <span class="n">pSiteConnectionPoint</span><span class="p">;</span>
+    <span class="n">DWORD</span>               <span class="n">dwSiteAdviseCookie</span><span class="p">;</span>
+    <span class="n">IUnknown</span><span class="o">*</span>           <span class="n">pSite</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="n">ObjectWithSite</span><span class="p">;</span>
+
+<span class="c1">// Class GUID for the Verity controller Browser Helper Object. </span>
+
+<span class="c1">// String value is `&quot;{0308456E-B8AA-4267-9A3E-09010E0A6754}&quot;`.</span>
+<span class="k">const</span> <span class="n">GUID</span> <span class="n">CLSID_IVerityController</span> <span class="o">=</span>
+<span class="p">{</span> <span class="mh">0x308456e</span><span class="p">,</span> <span class="mh">0xb8aa</span><span class="p">,</span> <span class="mh">0x4267</span><span class="p">,</span> 
+    <span class="p">{</span> <span class="mh">0x9a</span><span class="p">,</span> <span class="mh">0x3e</span><span class="p">,</span> <span class="mh">0x9</span><span class="p">,</span> <span class="mh">0x1</span><span class="p">,</span> <span class="mh">0xe</span><span class="p">,</span> <span class="mh">0xa</span><span class="p">,</span> <span class="mh">0x67</span><span class="p">,</span> <span class="mh">0x54</span> <span class="p">}</span> <span class="p">};</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>To create a COM object class, we define the functions, then at the end of the
+source file, we'll define a static structure that contains the functions.</p>
+
+<p>The Verity controller object first defines the <code>IUnknown</code> interface as all
+COM objects. The <code>IObjectWithSite</code> interface contains the three methods
+common to all COM objects, the <code>IUnknown</code> interface functions. It ads two
+methods <code>GetSite</code> and <code>SetSite</code>, which define a site property for the object</p></td>
+          <td class="code"><div class="highlight"><pre>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p><code>QueryInterface</code> &mdash; COM boilerplate that clients use to obtain pointers
+to virtual tables containing the methods that compose the different
+interfaces implemented by the COM object. This is <a href="http://msdn.microsoft.com/en-us/library/ms809982.aspx">basic
+COM</a>.</p></td>
+          <td class="code"><div class="highlight"><pre>
+
+<span class="k">static</span> <span class="n">REFIID</span> <span class="n">ariidImplemented</span><span class="p">[]</span> <span class="o">=</span>
+<span class="p">{</span>
+    <span class="o">&amp;</span><span class="n">IID_IUnknown</span><span class="p">,</span>
+    <span class="o">&amp;</span><span class="n">IID_IObjectWithSite</span><span class="p">,</span>
+    <span class="nb">NULL</span>
+<span class="p">};</span>
+
+<span class="n">QUERY_INTERFACE</span><span class="p">(</span><span class="n">IObjectWithSite</span><span class="p">,</span> <span class="n">ariidImplemented</span><span class="p">)</span>
+<span class="n">REFERENCE_COUNT</span><span class="p">(</span><span class="n">IObjectWithSite</span><span class="p">,</span> <span class="n">ObjectWithSite</span><span class="p">,</span> <span class="n">pdwLockCount</span><span class="p">,</span> <span class="n">NO_DESTRUCTOR</span><span class="p">)</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>We want to know when a page loads so we can check to see if we have a test we
+want to run against the page. This function installs an event handler for
+document load events. The web browser will not send us a document load event
+specifically. It will send us a slew of events. Our callback will filter. </p></td>
+          <td class="code"><div class="highlight"><pre>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="n">HRESULT</span>
+<span class="n">HookSite</span><span class="p">(</span><span class="n">ObjectWithSite</span><span class="o">*</span> <span class="n">pVerity</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">err</span><span class="p">;</span>
+    <span class="n">IUnknown</span><span class="o">*</span> <span class="n">pSite</span> <span class="o">=</span> <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span><span class="p">;</span>
+    <span class="n">IConnectionPointContainer</span><span class="o">*</span> <span class="n">pCPC</span><span class="p">;</span>
+    <span class="n">IConnectionPoint</span><span class="o">*</span> <span class="n">pCP</span><span class="p">;</span>
+    <span class="n">IUnknown</span> <span class="o">*</span><span class="n">pOnDocument</span><span class="p">;</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Get the connection point collection. Ask for the web browser connection
+point. Register a callback. The callback will be called for dozens of
+different types of web browser events, but we're only interested in the
+document load event. We can't make that distinction here, though, we
+make it in our callback. We have to get all the events, ignoring all but
+the document load event.</p></td>
+          <td class="code"><div class="highlight"><pre>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Obtain the <a href="http://www.codeproject.com/KB/COM/connectionpoint.aspx">connection points
+collection</a>, a
+collection of objects that register callbacks for events.</p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Setting hooks.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">));</span>
+    <span class="n">err</span> <span class="o">=</span> <span class="n">pSite</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">QueryInterface</span><span class="p">(</span><span class="n">pSite</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">IID_IConnectionPointContainer</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pCPC</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">err</span><span class="p">,</span> <span class="n">undoSetSite</span><span class="p">);</span>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Got IConnectionPointContainer.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">));</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>We get a connection point taht will inform us of <a href="http://msdn.microsoft.com/en-us/library/aa768283%28v=vs.85%29.aspx">web browser
+events</a>.</p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="n">err</span> <span class="o">=</span> <span class="n">pCPC</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">FindConnectionPoint</span><span class="p">(</span><span class="n">pCPC</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">DIID_DWebBrowserEvents2</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pCP</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">err</span><span class="p">,</span> <span class="n">undoSetSite</span><span class="p">);</span>
+    <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSiteConnectionPoint</span> <span class="o">=</span> <span class="n">pCP</span><span class="p">;</span>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Got dispatch connection point.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">));</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Register out web browser events callback function. </p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="n">GenericFactory_CreateInstance</span><span class="p">(</span><span class="s">L&quot;{42939237-42F0-4E3F-818E-FA63E4EB5A82}&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">IID_IUnknown</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pOnDocument</span><span class="p">);</span>
+    <span class="n">err</span> <span class="o">=</span> <span class="n">pCP</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Advise</span><span class="p">(</span><span class="n">pCP</span><span class="p">,</span> <span class="n">pOnDocument</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">dwSiteAdviseCookie</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">err</span><span class="p">,</span> <span class="n">undoConnectionPoint</span><span class="p">);</span>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Connection point advised.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">));</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Jump to exit. </p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="n">Done</span><span class="p">(</span><span class="n">exit</span><span class="p">);</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Or else cleanup on error. </p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="nl">undoConnectionPoint:</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;Failed on connection point %d.&quot;</span><span class="p">,</span> <span class="n">err</span> <span class="o">==</span> <span class="n">CONNECT_E_CANNOTCONNECT</span><span class="p">);</span>
+    <span class="n">pCP</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pCP</span><span class="p">);</span>
+<span class="nl">undoSetSite:</span>
+    <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span><span class="p">);</span>
+    <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="nl">exit:</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Done. </p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="k">return</span> <span class="n">err</span><span class="p">;</span>
+<span class="p">}</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>When <code>SetSite</code> is called more than once, we make sure to remove our web
+browser event handlers from the previous site that was set.</p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="kt">void</span>
+<span class="n">UnhookSite</span><span class="p">(</span><span class="n">ObjectWithSite</span><span class="o">*</span> <span class="n">pVerity</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">IUnknown</span><span class="o">*</span> <span class="n">pSite</span> <span class="o">=</span> <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span><span class="p">;</span>
+    <span class="n">IConnectionPoint</span><span class="o">*</span> <span class="n">pCP</span> <span class="o">=</span> <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSiteConnectionPoint</span><span class="p">;</span>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Unhook site.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">));</span>
+    <span class="n">pCP</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Unadvise</span><span class="p">(</span><span class="n">pCP</span><span class="p">,</span> <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">dwSiteAdviseCookie</span><span class="p">);</span>
+    <span class="n">pCP</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pCP</span><span class="p">);</span>
+    <span class="n">pSite</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pSite</span><span class="p">);</span>
+    <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="p">}</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p><code>SetSite</code> &mdash; After our Verity controller object is created, Internet
+Explorer will call this method to set the site property, passing in the web
+browser object, the object that is the the web browser client area, that
+implements many different browser related COM interfaces. </p></td>
+          <td class="code"><div class="highlight"><pre>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="n">IObjectWithSite_SetSite</span><span class="p">(</span><span class="n">IObjectWithSite</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">IUnknown</span> <span class="o">*</span><span class="n">pUnknown</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">err</span> <span class="o">=</span> <span class="n">S_OK</span><span class="p">;</span>
+    <span class="n">ObjectWithSite</span><span class="o">*</span> <span class="n">pVerity</span> <span class="o">=</span> <span class="p">(</span><span class="n">ObjectWithSite</span><span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Unset the prevoius web browser object if any. Remove the document oad
+event handler. </p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">UnhookSite</span><span class="p">(</span><span class="n">pVerity</span><span class="p">);</span>
+    <span class="p">}</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Set the web browser object if any. </p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span> <span class="o">=</span> <span class="n">pUnknown</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">HookSite</span><span class="p">(</span><span class="n">pVerity</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Set site: %d %d.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">),</span> <span class="n">err</span><span class="p">,</span> <span class="n">pUnknown</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">err</span><span class="p">;</span>
+<span class="p">}</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p><code>GetSite</code> &mdash; Get the site set by set site. The other half of a property
+getter/setter pair. You might not think this method would be called, because
+Internet Explorer wouldn't count on us to keep track of which web browser
+object is in its window, but it does.</p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="n">IObjectWithSite_GetSite</span><span class="p">(</span><span class="n">IObjectWithSite</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">riid</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="n">ppvSite</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">err</span> <span class="o">=</span> <span class="n">S_FALSE</span><span class="p">;</span>
+    <span class="n">ObjectWithSite</span><span class="o">*</span> <span class="n">pVerity</span> <span class="o">=</span> <span class="p">(</span><span class="n">ObjectWithSite</span><span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+    <span class="n">IUnknown</span><span class="o">*</span> <span class="n">pSite</span> <span class="o">=</span> <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pSite</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">pSite</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">QueryInterface</span><span class="p">(</span><span class="n">pSite</span><span class="p">,</span> <span class="n">riid</span><span class="p">,</span> <span class="n">ppvSite</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Get site: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">),</span> <span class="n">err</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">err</span><span class="p">;</span>
+<span class="p">}</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>The virtual table for our Verity controller COM object.</p>
+
+<p>Gather up the above functions into a virtual table structure and you have a
+COM class.</p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">const</span> <span class="n">IObjectWithSiteVtbl</span> <span class="n">ObjectWithSiteVtbl</span> <span class="o">=</span>
+<span class="p">{</span>
+    <span class="n">IObjectWithSite_QueryInterface</span><span class="p">,</span>
+    <span class="n">IObjectWithSite_AddRef</span><span class="p">,</span>
+    <span class="n">IObjectWithSite_Release</span><span class="p">,</span>
+    <span class="n">IObjectWithSite_SetSite</span><span class="p">,</span>
+    <span class="n">IObjectWithSite_GetSite</span>
+<span class="p">};</span>
+
+<span class="c1">// Create an instance of the Verity browser helper object.</span>
+<span class="k">static</span> <span class="n">HRESULT</span>
+<span class="nf">ObjectWithSite_CreateInstance</span><span class="p">(</span>
+    <span class="n">REFIID</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="n">ppv</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="n">HRESULT</span>              <span class="n">hr</span><span class="p">;</span>
+    <span class="n">ObjectWithSite</span>   <span class="o">*</span><span class="n">pVerity</span><span class="p">;</span>
+
+    <span class="c1">// Allocate the memory for the Verity browser helper object.</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">pVerity</span> <span class="o">=</span> <span class="n">GlobalAlloc</span><span class="p">(</span><span class="n">GMEM_FIXED</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">ObjectWithSite</span><span class="p">))))</span>
+    <span class="p">{</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">E_OUTOFMEMORY</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="c1">// Set the virtual function table and reference count.</span>
+        <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">lpVtbl</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">ObjectWithSiteVtbl</span><span class="p">;</span>
+        <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">dwCount</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+        <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSite</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="n">pVerity</span><span class="o">-&gt;</span><span class="n">pSiteConnectionPoint</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+
+        <span class="c1">// Increment the library lock count.</span>
+        <span class="n">InterlockedIncrement</span><span class="p">(</span><span class="n">pdwLockCount</span><span class="p">);</span>
+
+        <span class="c1">// Now use QueryInterface to set the caller&#39;s result pointer.</span>
+        <span class="c1">// QueryInterface will also check that request interface is the</span>
+        <span class="c1">// one supported by our Verity browser helper object.</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">ObjectWithSiteVtbl</span><span class="p">.</span><span class="n">QueryInterface</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">IObjectWithSite</span><span class="o">*</span><span class="p">)</span> <span class="n">pVerity</span><span class="p">,</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="n">ppv</span><span class="p">);</span>
+
+        <span class="c1">// If we had a problem above, then the reference count is still</span>
+        <span class="c1">// one, so decrementing it will free the memory we just allocated,</span>
+        <span class="c1">// otherwise, it is two and decrementing it makes it as it should</span>
+        <span class="c1">// be.</span>
+        <span class="n">ObjectWithSiteVtbl</span><span class="p">.</span><span class="n">Release</span><span class="p">((</span><span class="n">IObjectWithSite</span><span class="o">*</span><span class="p">)</span> <span class="n">pVerity</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Allocated: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">),</span> <span class="n">hr</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">HRESULT</span>
+<span class="nf">ObjectWithSite_CreateFactory</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">GenericFactory_CreateFactory</span><span class="p">(</span><span class="o">&amp;</span><span class="n">CLSID_IVerityController</span><span class="p">,</span>
+            <span class="n">ObjectWithSite_CreateInstance</span><span class="p">,</span> <span class="n">GenericFactory_GenericFinalizer</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pdwLockCount</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</pre></div></td>
+        </tr>
+      
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

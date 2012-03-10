@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>dllmain.c</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+  <table cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th class="docs"><h1>dllmain.c</th>
+        <th class="code"></th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="c1">// dllmain.cpp : Defines the entry point for the DLL application.</span>
+<span class="cp">#include &quot;stdafx.h&quot;</span>
+<span class="cp">#include &quot;GenericFactory.h&quot;</span>
+<span class="cp">#include &quot;dllmain.h&quot;</span>
+
+<span class="n">HRESULT</span> <span class="n">ObjectWithSite_CreateFactory</span><span class="p">();</span>
+<span class="n">HRESULT</span> <span class="n">ScriptContext_CreateFactory</span><span class="p">();</span>
+<span class="n">HRESULT</span> <span class="n">ActiveScriptSite_CreateFactory</span><span class="p">();</span>
+<span class="n">HRESULT</span> <span class="n">OnDocument_CreateFactory</span><span class="p">(</span><span class="n">HMODULE</span> <span class="n">hModule</span><span class="p">);</span>
+<span class="n">HRESULT</span> <span class="n">Observable_CreateFactory</span><span class="p">();</span>
+
+<span class="c1">// Functions for logging. The debugger is difficult with Internet Explorer. It</span>
+<span class="c1">// runs slowly and appears to cause a lot of problems for IE. We&#39;ve got a </span>
+<span class="c1">// simple sprintf based logger that writes a specific file on the filesystem.</span>
+<span class="c1">//</span>
+<span class="c1">// Logging is disabled in a release build.</span>
+
+<span class="cp">#ifdef _DEBUG</span>
+<span class="c1">// Generous buffer size for formatting error messages.</span>
+<span class="cp">#define LOG_BUFFER_LENGTH (1024 * 64) </span>
+
+<span class="c1">// Handle to our log file.</span>
+<span class="k">static</span> <span class="n">HFILE</span> <span class="n">hfLog</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+<span class="c1">// Convert wide characters to multibyte characters and write to the log file.</span>
+<span class="c1">// This function was split out into a separate function because the Log</span>
+<span class="c1">// function was getting cluttered.</span>
+<span class="k">static</span> <span class="kt">void</span>
+<span class="nf">WriteWideCharacterToLog</span><span class="p">(</span><span class="k">const</span> <span class="n">TCHAR</span><span class="o">*</span> <span class="n">pwsz</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">DWORD</span>       <span class="n">dwWritten</span><span class="p">;</span>
+    <span class="kt">size_t</span>      <span class="n">converted</span><span class="p">;</span>
+    <span class="kt">char</span>        <span class="n">psz</span><span class="p">[</span><span class="n">LOG_BUFFER_LENGTH</span><span class="p">];</span>
+    <span class="kt">mbstate_t</span>   <span class="n">mbstate</span><span class="p">;</span>
+    <span class="n">wcsrtombs_s</span><span class="p">(</span><span class="o">&amp;</span><span class="n">converted</span><span class="p">,</span> <span class="n">psz</span><span class="p">,</span> <span class="n">LOG_BUFFER_LENGTH</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pwsz</span><span class="p">,</span>
+                <span class="n">wcslen</span><span class="p">(</span><span class="n">pwsz</span><span class="p">)</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">TCHAR</span><span class="p">),</span> <span class="o">&amp;</span><span class="n">mbstate</span><span class="p">);</span>
+    <span class="n">WriteFile</span><span class="p">((</span><span class="n">HANDLE</span><span class="p">)</span> <span class="n">hfLog</span><span class="p">,</span> <span class="n">psz</span><span class="p">,</span> <span class="n">strlen</span><span class="p">(</span><span class="n">psz</span><span class="p">),</span> <span class="o">&amp;</span><span class="n">dwWritten</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// Format a logging message and write it to the log file. Always remember to use</span>
+<span class="c1">// a cousin of `vsprintf`, not `sprintf` itself. Read a man page. We use</span>
+<span class="c1">// convoluted wide character flavored `vsprintf` here.</span>
+<span class="kt">void</span>
+<span class="nf">Log</span><span class="p">(</span><span class="k">const</span> <span class="n">TCHAR</span><span class="o">*</span> <span class="n">format</span><span class="p">,</span> <span class="p">...)</span>
+<span class="p">{</span>
+    <span class="kt">va_list</span>     <span class="n">args</span><span class="p">;</span>
+    <span class="n">TCHAR</span>       <span class="n">pwsz</span><span class="p">[</span><span class="n">LOG_BUFFER_LENGTH</span><span class="p">];</span>
+    <span class="kt">size_t</span>      <span class="n">sLength</span> <span class="o">=</span> <span class="n">LOG_BUFFER_LENGTH</span><span class="p">;</span>
+    <span class="n">va_start</span><span class="p">(</span><span class="n">args</span><span class="p">,</span><span class="n">format</span><span class="p">);</span>
+    <span class="n">_vsnwprintf_s</span><span class="p">(</span><span class="n">pwsz</span><span class="p">,</span> <span class="n">LOG_BUFFER_LENGTH</span><span class="p">,</span>
+                  <span class="n">LOG_BUFFER_LENGTH</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">format</span><span class="p">,</span> <span class="n">args</span><span class="p">);</span>
+    <span class="n">va_end</span><span class="p">(</span><span class="n">args</span><span class="p">);</span>
+    <span class="n">WriteWideCharacterToLog</span><span class="p">(</span><span class="n">pwsz</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// Open a specific log file in our installation directory.</span>
+<span class="k">static</span> <span class="kt">void</span>
+<span class="nf">OpenLog</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="n">OFSTRUCT</span> <span class="n">ofstruct</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span> <span class="n">hfLog</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">hfLog</span> <span class="o">=</span> <span class="n">OpenFile</span><span class="p">(</span><span class="s">&quot;C:</span><span class="se">\\</span><span class="s">codearea</span><span class="se">\\</span><span class="s">touched.txt&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">ofstruct</span><span class="p">,</span> <span class="n">OF_CREATE</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+<span class="cp">#else</span>
+<span class="cp">#define OpenLog() void(0)</span>
+<span class="cp">#define Log(format, ...) void(0)</span>
+<span class="cp">#endif</span>
+
+<span class="k">static</span> <span class="n">HMODULE</span> <span class="n">hDllModule</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+<span class="c1">// Library entry point. When you register a browser helper object, it will be</span>
+<span class="c1">// looaded by both IE and Windows Explorer. We want nothing to do with Windows</span>
+<span class="c1">// Explorer, so we refuse to load when it calls us.</span>
+<span class="n">BOOL</span> <span class="n">APIENTRY</span> <span class="nf">DllMain</span><span class="p">(</span>
+    <span class="n">HMODULE</span> <span class="n">hModule</span><span class="p">,</span> <span class="n">DWORD</span>  <span class="n">dwReason</span><span class="p">,</span> <span class="n">LPVOID</span> <span class="n">lpReserved</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="n">TCHAR</span> <span class="n">pszLoader</span><span class="p">[</span><span class="n">MAX_PATH</span><span class="p">];</span>
+
+    <span class="n">OpenLog</span><span class="p">();</span>
+
+	<span class="k">switch</span> <span class="p">(</span><span class="n">dwReason</span><span class="p">)</span>
+	<span class="p">{</span>
+	<span class="k">case</span> <span class="n">DLL_PROCESS_ATTACH</span>:
+        <span class="n">hDllModule</span> <span class="o">=</span> <span class="n">hModule</span><span class="p">;</span>
+        <span class="n">DllRegisterServer</span><span class="p">();</span>
+        <span class="n">GetModuleFileName</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="n">pszLoader</span><span class="p">,</span> <span class="n">MAX_PATH</span><span class="p">);</span>
+        <span class="n">_tcslwr_s</span><span class="p">(</span><span class="n">pszLoader</span><span class="p">,</span> <span class="n">MAX_PATH</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">_tcsstr</span><span class="p">(</span><span class="n">pszLoader</span><span class="p">,</span> <span class="n">_T</span><span class="p">(</span><span class="s">&quot;explorer.exe&quot;</span><span class="p">)))</span>
+        <span class="p">{</span>
+            <span class="k">return</span> <span class="n">FALSE</span><span class="p">;</span>
+        <span class="p">}</span>
+        <span class="n">ActiveScriptSite_CreateFactory</span><span class="p">();</span>
+        <span class="n">OnDocument_CreateFactory</span><span class="p">(</span><span class="n">hModule</span><span class="p">);</span>
+        <span class="n">ObjectWithSite_CreateFactory</span><span class="p">();</span>
+        <span class="n">ScriptContext_CreateFactory</span><span class="p">();</span>
+        <span class="n">Observable_CreateFactory</span><span class="p">();</span>
+        <span class="n">hDllModule</span> <span class="o">=</span> <span class="n">hModule</span><span class="p">;</span>
+        <span class="k">break</span><span class="p">;</span>
+	<span class="k">case</span> <span class="n">DLL_THREAD_ATTACH</span>:
+	<span class="k">case</span> <span class="n">DLL_THREAD_DETACH</span>:
+        <span class="k">break</span><span class="p">;</span>
+	<span class="k">case</span> <span class="n">DLL_PROCESS_DETACH</span>:
+		<span class="k">break</span><span class="p">;</span>
+	<span class="p">}</span>
+
+	<span class="k">return</span> <span class="n">TRUE</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// DRY up the creation of a Windows Registry key.</span>
+<span class="k">static</span> <span class="n">LONG</span>
+<span class="nf">CreateKey</span><span class="p">(</span><span class="n">HKEY</span> <span class="n">hKey</span><span class="p">,</span> <span class="n">LPTSTR</span> <span class="n">lpzPath</span><span class="p">,</span> <span class="n">HKEY</span><span class="o">*</span> <span class="n">hkResult</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">DWORD</span> <span class="n">dwDisposition</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">RegCreateKeyEx</span><span class="p">(</span><span class="n">hKey</span><span class="p">,</span> <span class="n">lpzPath</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">REG_OPTION_NON_VOLATILE</span><span class="p">,</span>
+        <span class="n">KEY_WRITE</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">hkResult</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">dwDisposition</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// DRY up the setting of a Windows Registry value.</span>
+<span class="k">static</span> <span class="n">LONG</span>
+<span class="nf">SetString</span><span class="p">(</span><span class="n">HKEY</span> <span class="n">hKey</span><span class="p">,</span> <span class="n">LPTSTR</span> <span class="n">lpzPath</span><span class="p">,</span> <span class="n">LPTSTR</span> <span class="n">lpzValue</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">RegSetValueEx</span><span class="p">(</span><span class="n">hKey</span><span class="p">,</span> <span class="n">lpzPath</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">REG_SZ</span><span class="p">,</span>
+                         <span class="p">(</span><span class="n">CONST</span> <span class="n">BYTE</span> <span class="o">*</span><span class="p">)</span> <span class="n">lpzValue</span><span class="p">,</span>
+                         <span class="n">lstrlen</span><span class="p">(</span><span class="n">lpzValue</span><span class="p">)</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">TCHAR</span><span class="p">));</span>
+<span class="p">}</span>
+
+<span class="cp">#define CLSID_VERITY _T(&quot;{0308456E-B8AA-4267-9A3E-09010E0A6754}&quot;)</span>
+
+<span class="n">HRESULT</span> <span class="kr">__stdcall</span> <span class="nf">AddClass</span><span class="p">(</span><span class="n">LPTSTR</span> <span class="n">lpzClassKey</span><span class="p">,</span> <span class="n">LPTSTR</span> <span class="n">lpzControlName</span><span class="p">,</span> <span class="n">LPTSTR</span> <span class="n">lpzLibrary</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HKEY</span> <span class="n">hkClass</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">hkInproc</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">CreateKey</span><span class="p">(</span><span class="n">HKEY_CLASSES_ROOT</span><span class="p">,</span> <span class="n">lpzClassKey</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">hkClass</span><span class="p">))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">SetString</span><span class="p">(</span><span class="n">hkClass</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">lpzControlName</span><span class="p">))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">CreateKey</span><span class="p">(</span><span class="n">hkClass</span><span class="p">,</span> <span class="n">_T</span><span class="p">(</span><span class="s">&quot;InprocServer32&quot;</span><span class="p">),</span> <span class="o">&amp;</span><span class="n">hkInproc</span><span class="p">))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">SetString</span><span class="p">(</span><span class="n">hkInproc</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">lpzLibrary</span><span class="p">))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">SetString</span><span class="p">(</span><span class="n">hkInproc</span><span class="p">,</span> <span class="n">_T</span><span class="p">(</span><span class="s">&quot;TreadingModel&quot;</span><span class="p">),</span> <span class="n">_T</span><span class="p">(</span><span class="s">&quot;Apartment&quot;</span><span class="p">)))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+<span class="nl">exit:</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hkClass</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">RegCloseKey</span><span class="p">(</span><span class="n">hkClass</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hkInproc</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">RegCloseKey</span><span class="p">(</span><span class="n">hkInproc</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Register this browser helper object. This method is invoked by regsrv32.exe</span>
+<span class="c1">// during installation to set the Windows Registry keys that tell Internet</span>
+<span class="c1">// Explorer that we are a Browser Helper Object server.</span>
+<span class="n">HRESULT</span> <span class="kr">__stdcall</span> <span class="nf">DllRegisterServer</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HKEY</span> <span class="n">hkBHO</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">hkVerity</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">LPTYPELIB</span> <span class="n">pTypeLib</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span><span class="p">;</span>
+
+    <span class="n">WCHAR</span> <span class="n">lpzLibrary</span><span class="p">[</span><span class="n">MAX_PATH</span><span class="p">];</span>
+    <span class="n">LPTSTR</span> <span class="n">lpzControlName</span>   <span class="o">=</span> <span class="n">_T</span><span class="p">(</span><span class="s">&quot;Verity Controller&quot;</span><span class="p">);</span> 
+    <span class="n">LPTSTR</span> <span class="n">lpzClassKey</span>      <span class="o">=</span> <span class="n">_T</span><span class="p">(</span><span class="s">&quot;CLSID</span><span class="se">\\</span><span class="s">&quot;</span><span class="p">)</span> <span class="n">CLSID_VERITY</span><span class="p">;</span>
+    <span class="n">LPTSTR</span> <span class="n">lpzContextKey</span>    <span class="o">=</span> <span class="n">_T</span><span class="p">(</span><span class="s">&quot;CLSID</span><span class="se">\\</span><span class="s">{7CD57D42-C553-4B82-A52A-513082F57EE0}&quot;</span><span class="p">);</span>
+    <span class="n">LPTSTR</span> <span class="n">lpzOnDocumentKey</span> <span class="o">=</span> <span class="n">_T</span><span class="p">(</span><span class="s">&quot;CLSID</span><span class="se">\\</span><span class="s">{42939237-42F0-4E3F-818E-FA63E4EB5A82}&quot;</span><span class="p">);</span>
+    <span class="n">LPTSTR</span> <span class="n">lpzBHOKey</span>        <span class="o">=</span> <span class="n">_T</span><span class="p">(</span><span class="s">&quot;Software</span><span class="se">\\</span><span class="s">Microsoft</span><span class="se">\\</span><span class="s">Windows</span><span class="se">\\</span><span class="s">CurrentVersion</span><span class="se">\\</span><span class="s">&quot;</span><span class="p">)</span>
+                              <span class="n">_T</span><span class="p">(</span><span class="s">&quot;Explorer</span><span class="se">\\</span><span class="s">Browser Helper Objects&quot;</span><span class="p">);</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">GetModuleFileNameW</span><span class="p">(</span><span class="n">hDllModule</span><span class="p">,</span> <span class="n">lpzLibrary</span><span class="p">,</span> <span class="n">MAX_PATH</span><span class="p">))</span> <span class="p">{</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">E_FAIL</span><span class="p">;</span>
+        <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">AddClass</span><span class="p">(</span><span class="s">L&quot;CLSID</span><span class="se">\\</span><span class="s">&quot;</span> <span class="n">CLSID_VERITY</span><span class="p">,</span> <span class="s">L&quot;Verity Controller&quot;</span><span class="p">,</span> <span class="n">lpzLibrary</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">AddClass</span><span class="p">(</span><span class="s">L&quot;CLSID</span><span class="se">\\</span><span class="s">{73C6AB50-2BEE-4DC0-AB1C-910C255D1C23}&quot;</span><span class="p">,</span> <span class="s">L&quot;Verity ActiveScriptSite&quot;</span><span class="p">,</span> <span class="n">lpzLibrary</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">AddClass</span><span class="p">(</span><span class="s">L&quot;CLSID</span><span class="se">\\</span><span class="s">{42939237-42F0-4E3F-818E-FA63E4EB5A82}&quot;</span><span class="p">,</span> <span class="s">L&quot;Verity OnDocument Handler&quot;</span><span class="p">,</span> <span class="n">lpzLibrary</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">AddClass</span><span class="p">(</span><span class="s">L&quot;CLSID</span><span class="se">\\</span><span class="s">{7CD57D42-C553-4B82-A52A-513082F57EE0}&quot;</span><span class="p">,</span> <span class="s">L&quot;Verity Script Context&quot;</span><span class="p">,</span> <span class="n">lpzLibrary</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">CreateKey</span><span class="p">(</span><span class="n">HKEY_LOCAL_MACHINE</span><span class="p">,</span> <span class="n">lpzBHOKey</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">hkBHO</span><span class="p">))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">CreateKey</span><span class="p">(</span><span class="n">hkBHO</span><span class="p">,</span> <span class="n">CLSID_VERITY</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">hkVerity</span><span class="p">))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">SetString</span><span class="p">(</span><span class="n">hkVerity</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">lpzControlName</span><span class="p">))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">LoadTypeLib</span><span class="p">(</span><span class="n">lpzLibrary</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pTypeLib</span><span class="p">))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">RegisterTypeLib</span><span class="p">(</span><span class="n">pTypeLib</span><span class="p">,</span> <span class="n">lpzLibrary</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">))</span> <span class="k">goto</span> <span class="n">exit</span><span class="p">;</span>
+<span class="nl">exit:</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hkBHO</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">RegCloseKey</span><span class="p">(</span><span class="n">hkBHO</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hkVerity</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">RegCloseKey</span><span class="p">(</span><span class="n">hkVerity</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pTypeLib</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pTypeLib</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pTypeLib</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// TODO: Remove Browser Helper Object Windows Registry keys and the COM object</span>
+<span class="c1">// keys for the object.</span>
+<span class="n">HRESULT</span> <span class="kr">__stdcall</span> <span class="nf">DllUnregisterServer</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="kt">int</span> <span class="n">dwFactoryCount</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+<span class="k">typedef</span> <span class="k">struct</span> <span class="n">factory</span> <span class="p">{</span>
+    <span class="k">const</span> <span class="n">GUID</span> <span class="o">*</span><span class="n">clsid</span><span class="p">;</span>
+    <span class="n">IClassFactory</span> <span class="o">*</span><span class="n">pFactory</span><span class="p">;</span>
+    <span class="n">DWORD</span> <span class="n">dwLockCount</span><span class="p">;</span>
+    <span class="n">GenericFactory_Finalizer</span> <span class="n">finalizer</span><span class="p">;</span>
+<span class="p">}</span> <span class="n">IFactoryMapping</span><span class="p">;</span>
+<span class="k">static</span> <span class="n">IFactoryMapping</span> <span class="n">afmRegisteredFactories</span><span class="p">[</span><span class="mi">5</span><span class="p">];</span>
+
+<span class="n">DWORD</span><span class="o">*</span>
+<span class="nf">RegisterObjectFactory</span><span class="p">(</span><span class="k">const</span> <span class="n">GUID</span> <span class="o">*</span><span class="n">clsid</span><span class="p">,</span> <span class="n">IClassFactory</span> <span class="o">*</span><span class="n">pFactory</span><span class="p">,</span> <span class="n">GenericFactory_Finalizer</span> <span class="n">finalizer</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">IFactoryMapping</span> <span class="o">*</span><span class="n">fm</span><span class="p">;</span>
+    <span class="n">fm</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">afmRegisteredFactories</span><span class="p">[</span><span class="n">dwFactoryCount</span><span class="o">++</span><span class="p">];</span>
+    <span class="n">fm</span><span class="o">-&gt;</span><span class="n">clsid</span> <span class="o">=</span> <span class="n">clsid</span><span class="p">;</span>
+    <span class="n">fm</span><span class="o">-&gt;</span><span class="n">pFactory</span> <span class="o">=</span> <span class="n">pFactory</span><span class="p">;</span>
+    <span class="n">fm</span><span class="o">-&gt;</span><span class="n">finalizer</span> <span class="o">=</span> <span class="n">finalizer</span><span class="p">;</span>
+    <span class="k">return</span> <span class="o">&amp;</span><span class="n">fm</span><span class="o">-&gt;</span><span class="n">dwLockCount</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">HRESULT</span>
+<span class="nf">GenericFactory_GetFactory</span><span class="p">(</span><span class="n">REFCLSID</span> <span class="n">guidObject</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">guidFactory</span><span class="p">,</span> <span class="n">LPVOID</span> <span class="o">*</span><span class="n">ppvFactory</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">IClassFactory</span> <span class="o">*</span><span class="n">pFactory</span><span class="p">;</span>
+    <span class="kt">int</span> <span class="n">i</span><span class="p">;</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">dwFactoryCount</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">IsEqualCLSID</span><span class="p">(</span><span class="n">guidObject</span><span class="p">,</span> <span class="n">afmRegisteredFactories</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">clsid</span><span class="p">))</span>
+        <span class="p">{</span>
+            <span class="n">pFactory</span> <span class="o">=</span> <span class="n">afmRegisteredFactories</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pFactory</span><span class="p">;</span>
+            <span class="k">return</span> <span class="n">pFactory</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span>
+                <span class="n">QueryInterface</span><span class="p">(</span><span class="n">pFactory</span><span class="p">,</span> <span class="n">guidFactory</span><span class="p">,</span> <span class="n">ppvFactory</span><span class="p">);</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="o">*</span><span class="n">ppvFactory</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">CLASS_E_CLASSNOTAVAILABLE</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="c1">// If we&#39;re asked for Verity browser helper object, oblige by returning the</span>
+<span class="c1">// factory that makes them. Otherwise, set the factory result to NULL and flag</span>
+<span class="c1">// an error.</span>
+<span class="n">HRESULT</span> <span class="kr">__stdcall</span>
+<span class="nf">DllGetClassObject</span><span class="p">(</span><span class="n">REFCLSID</span> <span class="n">guidObject</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">guidFactory</span><span class="p">,</span> <span class="n">LPVOID</span> <span class="o">*</span><span class="n">ppvFactory</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">GenericFactory_GetFactory</span><span class="p">(</span><span class="n">guidObject</span><span class="p">,</span> <span class="n">guidFactory</span><span class="p">,</span> <span class="n">ppvFactory</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">HRESULT</span>
+<span class="nf">GenericFactory_CreateInstance</span><span class="p">(</span><span class="n">LPCTSTR</span> <span class="n">clsid</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">riid</span><span class="p">,</span> <span class="n">LPVOID</span> <span class="o">*</span><span class="n">pObject</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span><span class="p">;</span>
+    <span class="n">IClassFactory</span> <span class="o">*</span><span class="n">pClassFactory</span><span class="p">;</span>
+    <span class="n">GUID</span> <span class="n">guid</span><span class="p">;</span>
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">CLSIDFromString</span><span class="p">(</span><span class="n">clsid</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">guid</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">!=</span> <span class="n">S_OK</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">GenericFactory_GetFactory</span><span class="p">(</span><span class="o">&amp;</span><span class="n">guid</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">IID_IClassFactory</span><span class="p">,</span> <span class="p">(</span><span class="n">LPVOID</span><span class="o">*</span><span class="p">)</span> <span class="o">&amp;</span><span class="n">pClassFactory</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hr</span> <span class="o">!=</span> <span class="n">S_OK</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">pClassFactory</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">CreateInstance</span><span class="p">(</span><span class="n">pClassFactory</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">riid</span><span class="p">,</span> <span class="n">pObject</span><span class="p">);</span>
+    <span class="n">pClassFactory</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pClassFactory</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Don&#39;t unload this library if there are outstanding COM objects or explicit</span>
+<span class="c1">// locks on the library.</span>
+<span class="n">HRESULT</span> <span class="kr">__stdcall</span> <span class="nf">DllCanUnloadNow</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">int</span> <span class="n">i</span><span class="p">;</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">dwFactoryCount</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">afmRegisteredFactories</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">dwLockCount</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">return</span> <span class="n">S_FALSE</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</pre></div></td>
+        </tr>
+      
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

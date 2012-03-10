@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>OnDocument.c</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+  <table cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th class="docs"><h1>OnDocument.c</th>
+        <th class="code"></th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="cp">#include &quot;stdafx.h&quot;</span>
+
+<span class="cp">#include &quot;Log.h&quot;</span>
+<span class="cp">#include &quot;Jumps.h&quot;</span>
+<span class="cp">#include &quot;GenericFactory.h&quot;</span>
+<span class="cp">#include &quot;ComponentObjectModel.h&quot;</span>
+<span class="cp">#include &quot;ScriptContext.h&quot;</span>
+<span class="cp">#include &quot;ActiveScriptSite.h&quot;</span>
+<span class="cp">#include &quot;Pool.h&quot;</span>
+<span class="cp">#include &lt;Winhttp.h&gt;</span>
+
+<span class="k">static</span> <span class="n">DWORD</span> <span class="o">*</span><span class="n">pdwLockCount</span><span class="p">;</span>
+<span class="k">static</span> <span class="n">BSTR</span> <span class="n">bstrSource</span><span class="p">;</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>{42939237-42F0-4E3F-818E-FA63E4EB5A82} </p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="k">const</span> <span class="n">GUID</span> <span class="n">CLSID_IOnDocument</span> <span class="o">=</span>
+<span class="p">{</span> <span class="mh">0x42939237</span><span class="p">,</span> <span class="mh">0x42f0</span><span class="p">,</span> <span class="mh">0x4e3f</span><span class="p">,</span> <span class="p">{</span> <span class="mh">0x81</span><span class="p">,</span> <span class="mh">0x8e</span><span class="p">,</span> <span class="mh">0xfa</span><span class="p">,</span> <span class="mh">0x63</span><span class="p">,</span> <span class="mh">0xe4</span><span class="p">,</span> <span class="mh">0xeb</span><span class="p">,</span> <span class="mh">0x5a</span><span class="p">,</span> <span class="mh">0x82</span> <span class="p">}</span> <span class="p">};</span>
+
+<span class="k">typedef</span> <span class="k">struct</span> <span class="n">OnDocument</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="n">IDispatchVtbl</span> <span class="o">*</span><span class="n">lpVtbl</span><span class="p">;</span>
+    <span class="n">DWORD</span> <span class="n">dwCount</span><span class="p">;</span>
+    <span class="n">IActiveScript</span> <span class="o">*</span><span class="n">pActiveScript</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="n">OnDocument</span><span class="p">;</span>
+
+<span class="k">static</span> <span class="n">REFIID</span> <span class="n">ariidImplemented</span><span class="p">[]</span> <span class="o">=</span>
+<span class="p">{</span>
+    <span class="o">&amp;</span><span class="n">IID_IUnknown</span><span class="p">,</span>
+    <span class="o">&amp;</span><span class="n">IID_IDispatch</span><span class="p">,</span>
+    <span class="o">&amp;</span><span class="n">DIID_DWebBrowserEvents2</span><span class="p">,</span>
+    <span class="nb">NULL</span>
+<span class="p">};</span>
+
+<span class="n">QUERY_INTERFACE</span><span class="p">(</span><span class="n">IDispatch</span><span class="p">,</span> <span class="n">ariidImplemented</span><span class="p">)</span>
+<span class="n">REFERENCE_COUNT</span><span class="p">(</span><span class="n">IDispatch</span><span class="p">,</span> <span class="n">OnDocument</span><span class="p">,</span> <span class="n">pdwLockCount</span><span class="p">,</span> <span class="n">NO_DESTRUCTOR</span><span class="p">)</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="n">IDispatch_GetTypeInfoCount</span><span class="p">(</span>   
+    <span class="n">IDispatch</span> <span class="o">*</span> <span class="n">pSelf</span><span class="p">,</span> <span class="n">UINT</span> <span class="o">*</span><span class="n">pctinfo</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="o">*</span><span class="n">pctinfo</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Unexpected call to IDispatch::GetTypeInfoCount.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">));</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+        
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="n">IDispatch_GetTypeInfo</span><span class="p">(</span> 
+    <span class="n">IDispatch</span> <span class="o">*</span> <span class="n">This</span><span class="p">,</span> <span class="n">UINT</span> <span class="n">iTInfo</span><span class="p">,</span> <span class="n">LCID</span> <span class="n">lcid</span><span class="p">,</span> <span class="n">ITypeInfo</span> <span class="o">**</span><span class="n">ppTInfo</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Unexpected call to IDispatch::GetTypeInfo.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">));</span>
+    <span class="k">return</span> <span class="n">DISP_E_UNKNOWNNAME</span><span class="p">;</span>
+<span class="p">}</span>
+        
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="n">IDispatch_GetIDsOfNames</span><span class="p">(</span>
+    <span class="n">IDispatch</span> <span class="o">*</span> <span class="n">This</span><span class="p">,</span>
+    <span class="n">REFIID</span> <span class="n">riid</span><span class="p">,</span>
+    <span class="n">LPOLESTR</span> <span class="o">*</span><span class="n">rgszNames</span><span class="p">,</span>
+    <span class="n">UINT</span> <span class="n">cNames</span><span class="p">,</span>
+    <span class="n">LCID</span> <span class="n">lcid</span><span class="p">,</span>
+    <span class="n">DISPID</span> <span class="o">*</span><span class="n">rgDispId</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Unexpected call to IDispatch::GetIDsOfNames.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">));</span>
+    <span class="k">return</span> <span class="n">DISP_E_UNKNOWNNAME</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// TODO XHR does not have timeout mechanism, so we&#39;re going to have to use the</span>
+<span class="c1">// special timer ActiveX object that came along with Internet Explorer and XHR.</span>
+<span class="c1">// TODO This needs to be called IScriptInjector. It uses the peculiar behavior</span>
+<span class="c1">// of IXMLHttpRequest, that of accepting an IDispatch interface objet as a</span>
+<span class="c1">// readystatechange handler, through direct assignment of the handler, but not</span>
+<span class="c1">// through QueryInterface.</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span>
+<span class="n">GetEngineName</span><span class="p">(</span><span class="n">LPCTSTR</span> <span class="n">buffer</span><span class="p">,</span> <span class="kt">int</span> <span class="n">length</span><span class="p">,</span> <span class="n">LPCTSTR</span> <span class="n">subKey</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HKEY</span> <span class="n">hk</span><span class="p">,</span> <span class="n">hkSub</span><span class="p">;</span>
+    <span class="n">DWORD</span> <span class="n">err</span><span class="p">,</span> <span class="n">type</span> <span class="o">=</span> <span class="n">REG_SZ</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="n">length</span><span class="p">,</span>
+          <span class="n">read</span> <span class="o">=</span> <span class="n">KEY_QUERY_VALUE</span> <span class="o">|</span> <span class="n">KEY_READ</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">RegOpenKeyEx</span><span class="p">(</span><span class="n">HKEY_CLASSES_ROOT</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">read</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">hk</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">RegOpenKeyEx</span><span class="p">(</span><span class="n">hk</span><span class="p">,</span> <span class="s">L&quot;CLSID&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">read</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">hkSub</span><span class="p">))</span>
+        <span class="p">{</span>
+            <span class="n">err</span> <span class="o">=</span> <span class="n">RegQueryValueExW</span><span class="p">(</span><span class="n">hkSub</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">type</span><span class="p">,</span> <span class="p">(</span><span class="n">LPBYTE</span><span class="p">)</span> <span class="n">buffer</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">size</span><span class="p">);</span>
+            <span class="n">RegCloseKey</span><span class="p">(</span><span class="n">hkSub</span><span class="p">);</span>
+            <span class="n">RegCloseKey</span><span class="p">(</span><span class="n">hk</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="n">subKey</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">RegOpenKeyEx</span><span class="p">(</span><span class="n">hk</span><span class="p">,</span> <span class="n">subKey</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">read</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">hkSub</span><span class="p">))</span>
+            <span class="p">{</span>
+                <span class="n">err</span> <span class="o">=</span> <span class="n">RegQueryValueEx</span><span class="p">(</span><span class="n">hkSub</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">type</span><span class="p">,</span>
+                        <span class="p">(</span><span class="n">LPBYTE</span><span class="p">)</span> <span class="n">buffer</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">size</span><span class="p">);</span>
+                <span class="n">RegCloseKey</span><span class="p">(</span><span class="n">hkSub</span><span class="p">);</span>
+                <span class="n">RegCloseKey</span><span class="p">(</span><span class="n">hk</span><span class="p">);</span>
+                <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">err</span><span class="p">)</span>
+                <span class="p">{</span>
+                    <span class="n">err</span> <span class="o">=</span> <span class="n">GetEngineName</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+                <span class="p">}</span> 
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">E_FAIL</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span>
+<span class="n">GetEngineGUID</span><span class="p">(</span><span class="n">LPCTSTR</span> <span class="n">lpzExtension</span><span class="p">,</span> <span class="n">GUID</span> <span class="o">*</span><span class="n">guidBuffer</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HKEY</span> <span class="n">hk</span><span class="p">;</span>
+    <span class="kt">wchar_t</span> <span class="n">buffer</span><span class="p">[</span><span class="mi">256</span><span class="p">];</span>
+    <span class="n">DWORD</span> <span class="n">type</span> <span class="o">=</span> <span class="n">REG_SZ</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">err</span><span class="p">,</span> <span class="n">read</span> <span class="o">=</span> <span class="n">KEY_QUERY_VALUE</span> <span class="o">|</span> <span class="n">KEY_READ</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">RegOpenKeyEx</span><span class="p">(</span><span class="n">HKEY_CLASSES_ROOT</span><span class="p">,</span> <span class="n">lpzExtension</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">read</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">hk</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">RegQueryValueEx</span><span class="p">(</span><span class="n">hk</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">type</span><span class="p">,</span> <span class="p">(</span><span class="n">LPBYTE</span><span class="p">)</span><span class="n">buffer</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">size</span><span class="p">);</span>
+        <span class="n">RegCloseKey</span><span class="p">(</span><span class="n">hk</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">err</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">GetEngineName</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">),</span> <span class="s">L&quot;ScriptEngine&quot;</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">err</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">return</span> <span class="n">CLSIDFromString</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span> <span class="n">guidBuffer</span><span class="p">);</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">E_FAIL</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span>
+<span class="n">OnDocumentComplete</span><span class="p">(</span><span class="n">IDispatch</span><span class="o">*</span> <span class="n">pDispatch</span><span class="p">,</span> <span class="n">BSTR</span> <span class="n">bstrReferer</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span><span class="p">;</span>
+    <span class="n">GUID</span> <span class="n">guidJavaScript</span><span class="p">;</span>
+    <span class="n">OnDocument</span> <span class="o">*</span><span class="n">pOnDocument</span> <span class="o">=</span> <span class="p">(</span><span class="n">OnDocument</span> <span class="o">*</span><span class="p">)</span><span class="n">pDispatch</span><span class="p">;</span>
+    <span class="n">IActiveScript</span> <span class="o">*</span><span class="n">pActiveScript</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">IActiveScriptParse</span> <span class="o">*</span><span class="n">pActiveScriptParse</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">IActiveScriptSite</span> <span class="o">*</span><span class="n">pActiveScriptSite</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">IDispatch</span> <span class="o">*</span><span class="n">pDocument</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">IWebBrowser2</span><span class="o">*</span> <span class="n">pBrowser</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pScriptContext</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="n">DWORD</span> <span class="n">dwCount</span><span class="p">;</span>
+
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">pDispatch</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">QueryInterface</span><span class="p">(</span><span class="n">pDispatch</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">IID_IWebBrowser2</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pBrowser</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">pBrowser</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">get_Document</span><span class="p">(</span><span class="n">pBrowser</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pDocument</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">GetEngineGUID</span><span class="p">(</span><span class="s">L&quot;.js&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">guidJavaScript</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">CoCreateInstance</span><span class="p">(</span><span class="o">&amp;</span><span class="n">guidJavaScript</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">CLSCTX_ALL</span><span class="p">,</span>
+            <span class="o">&amp;</span><span class="n">IID_IActiveScript</span><span class="p">,</span> <span class="p">(</span><span class="n">LPVOID</span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">pActiveScript</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">pActiveScript</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">QueryInterface</span><span class="p">(</span><span class="n">pActiveScript</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">IID_IActiveScriptParse</span><span class="p">,</span>
+            <span class="o">&amp;</span><span class="n">pActiveScriptParse</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">pActiveScriptParse</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">InitNew</span><span class="p">(</span><span class="n">pActiveScriptParse</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">GenericFactory_CreateInstance</span><span class="p">(</span><span class="s">L&quot;{73C6AB50-2BEE-4DC0-AB1C-910C255D1C23}&quot;</span><span class="p">,</span>
+            <span class="o">&amp;</span><span class="n">IID_IActiveScriptSite</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pActiveScriptSite</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+
+    <span class="n">pScriptContext</span> <span class="o">=</span> <span class="p">((</span><span class="n">ActiveScriptSite</span><span class="o">*</span><span class="p">)</span> <span class="n">pActiveScriptSite</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">pScriptContext</span><span class="p">;</span>
+    <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">SetURL</span><span class="p">(</span><span class="n">pScriptContext</span><span class="p">,</span> <span class="n">bstrReferer</span><span class="p">);</span>
+    <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">SetDocument</span><span class="p">(</span><span class="n">pScriptContext</span><span class="p">,</span> <span class="n">pDocument</span><span class="p">);</span>
+    <span class="n">pActiveScript</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">SetScriptSite</span><span class="p">(</span><span class="n">pActiveScript</span><span class="p">,</span> <span class="n">pActiveScriptSite</span><span class="p">);</span>
+
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">pActiveScript</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">AddNamedItem</span><span class="p">(</span><span class="n">pActiveScript</span><span class="p">,</span> <span class="s">L&quot;verity&quot;</span><span class="p">,</span>
+            <span class="n">SCRIPTITEM_ISVISIBLE</span><span class="o">|</span><span class="n">SCRIPTITEM_NOCODE</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">pActiveScriptParse</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">ParseScriptText</span><span class="p">(</span><span class="n">pActiveScriptParse</span><span class="p">,</span> <span class="n">bstrSource</span><span class="p">,</span>
+            <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+
+    <span class="n">dwCount</span> <span class="o">=</span> <span class="n">pActiveScript</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">AddRef</span><span class="p">(</span><span class="n">pActiveScript</span><span class="p">);</span>
+    <span class="p">((</span><span class="n">ScriptContext</span><span class="o">*</span><span class="p">)</span><span class="n">pScriptContext</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">pActiveScript</span> <span class="o">=</span> <span class="n">pActiveScript</span><span class="p">;</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;ActiveScript COUNT: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">dwCount</span><span class="p">);</span>
+
+    <span class="n">hr</span> <span class="o">=</span> <span class="n">pActiveScript</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">SetScriptState</span><span class="p">(</span><span class="n">pActiveScript</span><span class="p">,</span> <span class="n">SCRIPTSTATE_CONNECTED</span><span class="p">);</span>
+    <span class="n">IsOkay</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">exit</span><span class="p">);</span>
+<span class="nl">exit:</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pActiveScriptParse</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pActiveScriptParse</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pActiveScriptParse</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pActiveScriptSite</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pActiveScriptSite</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pActiveScriptSite</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pActiveScript</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pActiveScript</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pActiveScript</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pDocument</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pDocument</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pDocument</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pBrowser</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pBrowser</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pBrowser</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+        
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="n">IDispatch_Invoke</span><span class="p">(</span>
+    <span class="n">IDispatch</span> <span class="o">*</span> <span class="n">This</span><span class="p">,</span>
+    <span class="n">DISPID</span> <span class="n">dispIdMember</span><span class="p">,</span>
+    <span class="n">REFIID</span> <span class="n">riid</span><span class="p">,</span>
+    <span class="n">LCID</span> <span class="n">lcid</span><span class="p">,</span>
+    <span class="n">WORD</span> <span class="n">wFlags</span><span class="p">,</span>
+    <span class="n">DISPPARAMS</span> <span class="o">*</span><span class="n">pDispParams</span><span class="p">,</span>
+    <span class="n">VARIANT</span> <span class="o">*</span><span class="n">pVarResult</span><span class="p">,</span>
+    <span class="n">EXCEPINFO</span> <span class="o">*</span><span class="n">pExcepInfo</span><span class="p">,</span>
+    <span class="n">UINT</span> <span class="o">*</span><span class="n">puArgErr</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">err</span> <span class="o">=</span> <span class="n">S_OK</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">dispIdMember</span> <span class="o">==</span> <span class="n">DISPID_NAVIGATECOMPLETE2</span><span class="p">)</span> <span class="p">{</span>
+        <span class="c1">// Parameters are passed in the opposite order of the documentation.</span>
+        <span class="c1">// The IDispatch pointer is in the first argument of two arguments,</span>
+        <span class="c1">// therefore it is the last argument here. The IDispatch pointer is</span>
+        <span class="c1">// inside a VARIANT, so we need to go from the argument variant,</span>
+        <span class="c1">// through a variant to get to our IDispatch.</span>
+        <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Document HOOOKED! %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">),</span> <span class="n">GetCurrentThreadId</span><span class="p">());</span>
+        <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;Called: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">pDispParams</span><span class="o">-&gt;</span><span class="n">cArgs</span><span class="p">);</span>
+        <span class="n">err</span> <span class="o">=</span> <span class="n">OnDocumentComplete</span><span class="p">(</span><span class="n">pDispParams</span><span class="o">-&gt;</span><span class="n">rgvarg</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">pvarVal</span><span class="o">-&gt;</span><span class="n">pdispVal</span><span class="p">,</span>
+            <span class="n">pDispParams</span><span class="o">-&gt;</span><span class="n">rgvarg</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">pvarVal</span><span class="o">-&gt;</span><span class="n">bstrVal</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">err</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="k">const</span> <span class="n">IDispatchVtbl</span> <span class="n">OnDocumentVtbl</span> <span class="o">=</span>
+<span class="p">{</span>
+    <span class="n">IDispatch_QueryInterface</span><span class="p">,</span>
+    <span class="n">IDispatch_AddRef</span><span class="p">,</span>
+    <span class="n">IDispatch_Release</span><span class="p">,</span>
+    <span class="n">IDispatch_GetTypeInfoCount</span><span class="p">,</span>
+    <span class="n">IDispatch_GetTypeInfo</span><span class="p">,</span>
+    <span class="n">IDispatch_GetIDsOfNames</span><span class="p">,</span>
+    <span class="n">IDispatch_Invoke</span>    
+<span class="p">};</span>
+
+<span class="c1">// Create an instance of the Verity browser helper object.</span>
+<span class="k">static</span> <span class="n">HRESULT</span>
+<span class="nf">OnDocument_CreateInstance</span><span class="p">(</span><span class="n">REFIID</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="n">ppv</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span>              <span class="n">hr</span><span class="p">;</span>
+    <span class="n">OnDocument</span>         <span class="o">*</span><span class="n">pOnDocument</span><span class="p">;</span>
+
+    <span class="c1">// Allocate the memory for the Verity browser helper object.</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">pOnDocument</span> <span class="o">=</span> <span class="n">GlobalAlloc</span><span class="p">(</span><span class="n">GMEM_FIXED</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">OnDocument</span><span class="p">))))</span>
+    <span class="p">{</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">E_OUTOFMEMORY</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="c1">// Set the virtual function table and reference count.</span>
+        <span class="n">pOnDocument</span><span class="o">-&gt;</span><span class="n">lpVtbl</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">OnDocumentVtbl</span><span class="p">;</span>
+        <span class="n">pOnDocument</span><span class="o">-&gt;</span><span class="n">dwCount</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+        <span class="n">pOnDocument</span><span class="o">-&gt;</span><span class="n">pActiveScript</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+
+        <span class="c1">// Increment the library lock count.</span>
+        <span class="n">InterlockedIncrement</span><span class="p">(</span><span class="n">pdwLockCount</span><span class="p">);</span>
+
+        <span class="c1">// Now use QueryInterface to set the caller&#39;s result pointer.</span>
+        <span class="c1">// QueryInterface will also check that request interface is the</span>
+        <span class="c1">// one supported by our Verity browser helper object.</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">OnDocumentVtbl</span><span class="p">.</span><span class="n">QueryInterface</span><span class="p">((</span><span class="n">IDispatch</span><span class="o">*</span><span class="p">)</span> <span class="n">pOnDocument</span><span class="p">,</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="n">ppv</span><span class="p">);</span>
+
+        <span class="c1">// If we had a problem above, then the reference count is still</span>
+        <span class="c1">// one, so decrementing it will free the memory we just allocated,</span>
+        <span class="c1">// otherwise, it is two and decrementing it makes it as it should</span>
+        <span class="c1">// be.</span>
+        <span class="n">OnDocumentVtbl</span><span class="p">.</span><span class="n">Release</span><span class="p">((</span><span class="n">IDispatch</span><span class="o">*</span><span class="p">)</span> <span class="n">pOnDocument</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Allocated: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">),</span> <span class="n">hr</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">WCHAR</span> <span class="o">*</span><span class="n">Scripts</span><span class="p">[]</span> <span class="o">=</span> <span class="p">{</span> <span class="s">L&quot;json2.js&quot;</span><span class="p">,</span> <span class="s">L&quot;boilerplate.js&quot;</span><span class="p">,</span> <span class="s">L&quot;background.js&quot;</span><span class="p">,</span> <span class="s">L&quot;ie.js&quot;</span><span class="p">,</span> <span class="nb">NULL</span> <span class="p">};</span>
+
+<span class="k">struct</span> <span class="n">ScriptSource</span>
+<span class="p">{</span>
+    <span class="n">CHAR</span> <span class="o">*</span><span class="n">lpzSource</span><span class="p">;</span>
+    <span class="n">DWORD</span> <span class="n">dwLength</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">struct</span> <span class="n">ScriptSource</span> <span class="n">ScriptSources</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span>
+
+<span class="kt">void</span>
+<span class="nf">DirectoryName</span><span class="p">(</span><span class="n">WCHAR</span> <span class="o">*</span><span class="n">lpzFileName</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">DWORD</span> <span class="n">dwLength</span> <span class="o">=</span> <span class="n">wcslen</span><span class="p">(</span><span class="n">lpzFileName</span><span class="p">);</span>
+    <span class="k">while</span> <span class="p">(</span><span class="n">lpzFileName</span><span class="p">[</span><span class="o">--</span><span class="n">dwLength</span><span class="p">]</span> <span class="o">!=</span> <span class="sc">&#39;\\&#39;</span><span class="p">)</span>
+    <span class="p">{</span> <span class="c1">// Do nothing.</span>
+    <span class="p">}</span>
+    <span class="n">lpzFileName</span><span class="p">[</span><span class="n">dwLength</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="sc">&#39;\0&#39;</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">HRESULT</span>
+<span class="nf">LoadScripts</span><span class="p">(</span><span class="n">HMODULE</span> <span class="n">hModule</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">DWORD</span> <span class="n">dwLength</span><span class="p">,</span> <span class="n">dwRead</span><span class="p">,</span> <span class="n">dwMultiByteLength</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dwChunkSize</span><span class="p">;</span>
+    <span class="n">WCHAR</span> <span class="o">*</span><span class="n">lpzChunk</span><span class="p">,</span> <span class="o">*</span><span class="n">lpzWideSource</span><span class="p">;</span>
+    <span class="n">CHAR</span> <span class="o">*</span><span class="n">lpzUTF8Source</span><span class="p">;</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span> <span class="o">=</span> <span class="n">S_OK</span><span class="p">;</span>
+    <span class="n">WCHAR</span> <span class="n">lpzLibrary</span><span class="p">[</span><span class="n">MAX_PATH</span><span class="p">];</span>
+    <span class="n">HANDLE</span> <span class="n">hFile</span><span class="p">;</span>
+    <span class="kt">int</span> <span class="n">i</span><span class="p">;</span>
+
+    <span class="n">GetModuleFileName</span><span class="p">(</span><span class="n">hModule</span><span class="p">,</span> <span class="n">lpzLibrary</span><span class="p">,</span> <span class="n">MAX_PATH</span><span class="p">);</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">Scripts</span><span class="p">[</span><span class="n">i</span><span class="p">];</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">DirectoryName</span><span class="p">(</span><span class="n">lpzLibrary</span><span class="p">);</span>
+        <span class="n">wcscat_s</span><span class="p">(</span><span class="n">lpzLibrary</span><span class="p">,</span> <span class="n">MAX_PATH</span><span class="p">,</span> <span class="n">Scripts</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+        <span class="n">hFile</span> <span class="o">=</span> <span class="n">CreateFile</span><span class="p">(</span><span class="n">lpzLibrary</span><span class="p">,</span> <span class="n">GENERIC_READ</span><span class="p">,</span> <span class="n">FILE_SHARE_READ</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">OPEN_EXISTING</span><span class="p">,</span> <span class="n">FILE_ATTRIBUTE_NORMAL</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+        <span class="n">dwLength</span> <span class="o">=</span> <span class="n">GetFileSize</span><span class="p">(</span><span class="n">hFile</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+        <span class="n">lpzUTF8Source</span> <span class="o">=</span> <span class="p">(</span><span class="n">CHAR</span><span class="o">*</span><span class="p">)</span> <span class="n">GlobalAlloc</span><span class="p">(</span><span class="n">GMEM_FIXED</span><span class="p">,</span> <span class="n">dwLength</span> <span class="o">+</span> <span class="mi">1</span><span class="p">);</span>
+        <span class="n">ReadFile</span><span class="p">(</span><span class="n">hFile</span><span class="p">,</span> <span class="n">lpzUTF8Source</span><span class="p">,</span> <span class="n">dwLength</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">dwRead</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+        <span class="n">dwMultiByteLength</span> <span class="o">+=</span> <span class="n">MultiByteToWideChar</span><span class="p">(</span><span class="n">CP_UTF8</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">lpzUTF8Source</span><span class="p">,</span> <span class="n">dwLength</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+        <span class="n">ScriptSources</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">lpzSource</span> <span class="o">=</span> <span class="n">lpzUTF8Source</span><span class="p">;</span>
+        <span class="n">ScriptSources</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">dwLength</span> <span class="o">=</span> <span class="n">dwLength</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">dwMultiByteLength</span><span class="o">++</span><span class="p">;</span>
+
+    <span class="n">dwChunkSize</span> <span class="o">=</span> <span class="n">dwMultiByteLength</span><span class="p">;</span>
+    <span class="n">lpzWideSource</span> <span class="o">=</span> <span class="n">lpzChunk</span> <span class="o">=</span> <span class="p">(</span><span class="n">WCHAR</span><span class="o">*</span><span class="p">)</span> <span class="n">GlobalAlloc</span><span class="p">(</span><span class="n">GMEM_FIXED</span><span class="p">,</span> <span class="n">dwMultiByteLength</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">WCHAR</span><span class="p">));</span>
+    <span class="n">lpzWideSource</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="sc">&#39;\0&#39;</span><span class="p">;</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">Scripts</span><span class="p">[</span><span class="n">i</span><span class="p">];</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">lpzUTF8Source</span> <span class="o">=</span> <span class="n">ScriptSources</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">lpzSource</span><span class="p">;</span>
+        <span class="n">dwLength</span> <span class="o">=</span> <span class="n">ScriptSources</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">dwLength</span><span class="p">;</span>
+        <span class="n">dwLength</span> <span class="o">=</span> <span class="n">MultiByteToWideChar</span><span class="p">(</span><span class="n">CP_UTF8</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">lpzUTF8Source</span><span class="p">,</span> <span class="n">dwLength</span><span class="p">,</span> <span class="n">lpzChunk</span><span class="p">,</span> <span class="n">dwChunkSize</span><span class="p">);</span>
+        <span class="n">lpzChunk</span> <span class="o">+=</span> <span class="n">dwLength</span><span class="p">;</span>
+        <span class="n">dwChunkSize</span> <span class="o">-=</span> <span class="n">dwLength</span><span class="p">;</span>
+        <span class="n">GlobalFree</span><span class="p">(</span><span class="n">lpzUTF8Source</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="o">*</span><span class="n">lpzChunk</span> <span class="o">=</span> <span class="sc">&#39;\0&#39;</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">wcslen</span><span class="p">(</span><span class="n">lpzWideSource</span><span class="p">)</span> <span class="o">!=</span> <span class="n">dwMultiByteLength</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="n">E_FAIL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">bstrSource</span> <span class="o">=</span> <span class="n">SysAllocString</span><span class="p">(</span><span class="n">lpzWideSource</span><span class="p">);</span>
+    <span class="n">GlobalFree</span><span class="p">(</span><span class="n">lpzWideSource</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span>
+<span class="nf">OnDocument_Finalizer</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">bstrSource</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">SysFreeString</span><span class="p">(</span><span class="n">bstrSource</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">HRESULT</span>
+<span class="nf">OnDocument_CreateFactory</span><span class="p">(</span><span class="n">HMODULE</span> <span class="n">hModule</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">LoadScripts</span><span class="p">(</span><span class="n">hModule</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">GenericFactory_CreateFactory</span><span class="p">(</span><span class="o">&amp;</span><span class="n">CLSID_IOnDocument</span><span class="p">,</span> <span class="n">OnDocument_CreateInstance</span><span class="p">,</span> <span class="n">GenericFactory_GenericFinalizer</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pdwLockCount</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</pre></div></td>
+        </tr>
+      
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

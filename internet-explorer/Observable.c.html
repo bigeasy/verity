@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Observable.c</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+  <table cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th class="docs"><h1>Observable.c</th>
+        <th class="code"></th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="cp">#include &quot;stdafx.h&quot;</span>
+<span class="cp">#include &quot;ComponentObjectModel.h&quot;</span>
+<span class="cp">#include &quot;GenericFactory.h&quot;</span>
+
+<span class="k">static</span> <span class="n">DWORD</span> <span class="o">*</span><span class="n">pdwLockCount</span><span class="p">;</span>
+
+<span class="c1">// {3C8C461C-5543-468A-A0D2-334C6B6E54E8}</span>
+<span class="k">const</span> <span class="n">GUID</span> <span class="n">CLSID_Observable</span> <span class="o">=</span> 
+<span class="p">{</span> <span class="mh">0x3c8c461c</span><span class="p">,</span> <span class="mh">0x5543</span><span class="p">,</span> <span class="mh">0x468a</span><span class="p">,</span> <span class="p">{</span> <span class="mh">0xa0</span><span class="p">,</span> <span class="mh">0xd2</span><span class="p">,</span> <span class="mh">0x33</span><span class="p">,</span> <span class="mh">0x4c</span><span class="p">,</span> <span class="mh">0x6b</span><span class="p">,</span> <span class="mh">0x6e</span><span class="p">,</span> <span class="mh">0x54</span><span class="p">,</span> <span class="mh">0xe8</span> <span class="p">}</span> <span class="p">};</span>
+
+
+<span class="k">static</span> <span class="n">REFIID</span> <span class="n">ariidImplemented</span><span class="p">[]</span> <span class="o">=</span>
+<span class="p">{</span>
+    <span class="o">&amp;</span><span class="n">IID_IUnknown</span><span class="p">,</span>
+    <span class="o">&amp;</span><span class="n">IID_IDispatch</span><span class="p">,</span>
+    <span class="nb">NULL</span>
+<span class="p">};</span>
+
+<span class="k">typedef</span> <span class="k">struct</span> <span class="n">Observable</span>
+<span class="p">{</span>
+    <span class="k">const</span> <span class="n">IDispatchVtbl</span> <span class="o">*</span><span class="n">lpVtbl</span><span class="p">;</span>
+    <span class="n">DWORD</span> <span class="n">dwCount</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="n">Observable</span><span class="p">;</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IDispatch_QueryInterface</span><span class="p">(</span><span class="n">IDispatch</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">riid</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="n">ppv</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">IsIIDImplemented</span><span class="p">(</span><span class="n">riid</span><span class="p">,</span> <span class="n">ariidImplemented</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="o">*</span><span class="n">ppv</span> <span class="o">=</span> <span class="n">pSelf</span><span class="p">;</span>
+        <span class="n">pSelf</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">AddRef</span><span class="p">(</span><span class="n">pSelf</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="o">*</span><span class="n">ppv</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">E_NOINTERFACE</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IDispatch_AddRef</span><span class="p">(</span><span class="n">IDispatch</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">Observable</span> <span class="o">*</span><span class="n">pObservable</span> <span class="o">=</span> <span class="p">(</span><span class="n">Observable</span> <span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+    <span class="k">return</span> <span class="o">++</span><span class="n">pObservable</span><span class="o">-&gt;</span><span class="n">dwCount</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IDispatch_Release</span><span class="p">(</span><span class="n">IDispatch</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">Observable</span> <span class="o">*</span><span class="n">pObservable</span> <span class="o">=</span> <span class="p">(</span><span class="n">Observable</span> <span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+    <span class="n">DWORD</span> <span class="n">dwCount</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">((</span><span class="n">dwCount</span> <span class="o">=</span> <span class="o">--</span><span class="n">pObservable</span><span class="o">-&gt;</span><span class="n">dwCount</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">GlobalFree</span><span class="p">(</span><span class="n">pObservable</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">dwCount</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IDispatch_GetTypeInfoCount</span><span class="p">(</span><span class="n">IDispatch</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">UINT</span> <span class="o">*</span><span class="n">pctinfo</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="o">*</span><span class="n">pctinfo</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Type info is loaded from out type definition. </p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IDispatch_GetTypeInfo</span> <span class="p">(</span><span class="n">IDispatch</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">UINT</span> <span class="n">iTInfo</span><span class="p">,</span> <span class="n">LCID</span> <span class="n">lcid</span><span class="p">,</span> <span class="n">ITypeInfo</span> <span class="o">**</span> <span class="n">ppTInfo</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span> <span class="o">=</span> <span class="n">S_OK</span><span class="p">;</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>ppTInfo = NULL;</p>
+
+<pre><code>if (iTInfo)
+{
+    hr = ResultFromScode(DISP_E_BADINDEX);
+}
+else
+{
+    if (!TypeInfo)
+    {
+        hr = loadTypeInfo();
+    }
+    if (TypeInfo)
+    {
+        TypeInfo-&gt;lpVtbl-&gt;AddRef(TypeInfo);
+    }
+}
+</code></pre></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IDispatch_GetIDsOfNames</span> <span class="p">(</span><span class="n">IDispatch</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">refiid</span><span class="p">,</span> <span class="n">LPOLESTR</span> <span class="o">*</span><span class="n">rgszNames</span><span class="p">,</span>
+        <span class="n">UINT</span> <span class="n">cNames</span><span class="p">,</span> <span class="n">LCID</span> <span class="n">lcid</span><span class="p">,</span> <span class="n">DISPID</span> <span class="o">*</span><span class="n">rgDispId</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span> <span class="o">=</span> <span class="n">S_OK</span><span class="p">;</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><pre><code>if (!TypeInfo &amp;&amp; (hr = loadTypeInfo()))
+{
+    return hr; 
+}
+
+return DispGetIDsOfNames(TypeInfo, rgszNames, cNames, rgDispId);
+</code></pre></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IDispatch_Invoke</span> <span class="p">(</span><span class="n">IDispatch</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">DISPID</span> <span class="n">dispIdNumber</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">refiid</span><span class="p">,</span>
+        <span class="n">LCID</span> <span class="n">lcid</span><span class="p">,</span> <span class="n">WORD</span> <span class="n">wFlags</span><span class="p">,</span> <span class="n">DISPPARAMS</span> <span class="o">*</span><span class="n">pDispParams</span><span class="p">,</span> <span class="n">VARIANT</span> <span class="o">*</span><span class="n">pVarResult</span><span class="p">,</span>
+        <span class="n">EXCEPINFO</span> <span class="o">*</span><span class="n">pExcepInfo</span><span class="p">,</span> <span class="n">UINT</span> <span class="o">*</span><span class="n">puArgErr</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span> <span class="o">=</span> <span class="n">S_OK</span><span class="p">;</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><pre><code>VARIANT vResult;
+
+VariantInit(&amp;vResult);
+
+if (!IsEqualIID(refiid, &amp;IID_NULL))
+{
+    return DISP_E_UNKNOWNINTERFACE;
+}
+
+if (!TypeInfo &amp;&amp; (hr = loadTypeInfo()))
+{
+    return hr;
+}
+
+return DispInvoke(pSelf, TypeInfo, dispIdNumber, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
+</code></pre></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">IDispatchVtbl</span> <span class="n">ObservableVtbl</span> <span class="o">=</span>
+<span class="p">{</span>
+    <span class="n">IDispatch_QueryInterface</span><span class="p">,</span>
+    <span class="n">IDispatch_AddRef</span><span class="p">,</span>
+    <span class="n">IDispatch_Release</span><span class="p">,</span>
+    <span class="n">IDispatch_GetTypeInfoCount</span><span class="p">,</span>
+    <span class="n">IDispatch_GetTypeInfo</span><span class="p">,</span>
+    <span class="n">IDispatch_GetIDsOfNames</span><span class="p">,</span>
+    <span class="n">IDispatch_Invoke</span>
+<span class="p">};</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span>
+<span class="nf">Observable_CreateInstance</span><span class="p">(</span>
+    <span class="n">REFIID</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="n">ppv</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="n">HRESULT</span>              <span class="n">hr</span><span class="p">;</span>
+    <span class="n">Observable</span>          <span class="o">*</span><span class="n">pObservable</span><span class="p">;</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">pObservable</span> <span class="o">=</span> <span class="n">GlobalAlloc</span><span class="p">(</span><span class="n">GMEM_FIXED</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">Observable</span><span class="p">))))</span>
+    <span class="p">{</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">E_OUTOFMEMORY</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="n">pObservable</span><span class="o">-&gt;</span><span class="n">lpVtbl</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">ObservableVtbl</span><span class="p">;</span>
+        <span class="n">pObservable</span><span class="o">-&gt;</span><span class="n">dwCount</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+        <span class="n">InterlockedIncrement</span><span class="p">(</span><span class="n">pdwLockCount</span><span class="p">);</span>
+
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">ObservableVtbl</span><span class="p">.</span><span class="n">QueryInterface</span><span class="p">((</span><span class="n">IDispatch</span><span class="o">*</span><span class="p">)</span> <span class="n">pObservable</span><span class="p">,</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="n">ppv</span><span class="p">);</span>
+
+        <span class="n">ObservableVtbl</span><span class="p">.</span><span class="n">Release</span><span class="p">((</span><span class="n">IDispatch</span><span class="o">*</span><span class="p">)</span> <span class="n">pObservable</span><span class="p">);</span>
+
+        <span class="o">*</span><span class="n">ppv</span> <span class="o">=</span> <span class="n">pObservable</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">HRESULT</span>
+<span class="nf">Observable_CreateFactory</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">GenericFactory_CreateFactory</span><span class="p">(</span><span class="o">&amp;</span><span class="n">CLSID_Observable</span><span class="p">,</span> <span class="n">Observable_CreateInstance</span><span class="p">,</span> <span class="n">GenericFactory_GenericFinalizer</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pdwLockCount</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</pre></div></td>
+        </tr>
+      
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

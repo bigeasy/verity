@@ -4,3 +4,6 @@
 [submodule "edify"]
 	path = edify
 	url = git://github.com/bigeasy/edify.git
+[submodule "code/internet-explorer"]
+	path = code/internet-explorer
+	url = git://github.com/bigeasy/verity.git

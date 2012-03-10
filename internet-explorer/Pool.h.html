@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Pool.h</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+  <table cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th class="docs"><h1>Pool.h</th>
+        <th class="code"></th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="c1">// Really struggled to find arbitrary names with opaque meaning and</span>
+<span class="c1">// inconsistant notations so that Windows programmers would feel comfortable.</span>
+<span class="k">typedef</span> <span class="k">struct</span> <span class="n">CListNode</span> <span class="n">LISTNODE</span><span class="p">;</span>
+<span class="k">typedef</span> <span class="k">struct</span> <span class="n">CListNode</span> <span class="p">{</span>
+    <span class="n">LISTNODE</span><span class="o">*</span>   <span class="n">pNext</span><span class="p">;</span>
+    <span class="n">LISTNODE</span><span class="o">*</span>   <span class="n">pPrevious</span><span class="p">;</span>
+    <span class="n">LPVOID</span>      <span class="n">pvValue</span><span class="p">;</span>      
+<span class="p">}</span> <span class="n">LISTNODE</span><span class="p">;</span>
+
+<span class="n">HANDLE</span>      <span class="n">PoolAllocPool</span>           <span class="p">();</span>
+<span class="n">LISTNODE</span><span class="o">*</span>   <span class="n">PoolAllocNode</span>           <span class="p">(</span><span class="n">HANDLE</span> <span class="n">hList</span><span class="p">);</span>
+<span class="n">BSTR</span>        <span class="n">PoolAllocStringBytes</span>    <span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">,</span> <span class="n">UINT</span> <span class="n">uiBytes</span><span class="p">);</span>
+<span class="n">BSTR</span>        <span class="n">PoolAllocString</span>         <span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">,</span> <span class="n">TCHAR</span><span class="o">*</span> <span class="n">tstr</span><span class="p">);</span>
+<span class="n">HRESULT</span>     <span class="n">PoolQueryInterface</span>      <span class="p">(</span><span class="n">HANDLE</span> <span class="n">hPool</span><span class="p">,</span> <span class="n">LPVOID</span> <span class="n">pSelf</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="n">LPVOID</span><span class="o">*</span> <span class="n">ppv</span><span class="p">);</span>
+<span class="n">HRESULT</span>     <span class="n">PoolCoCreateInstance</span>    <span class="p">(</span><span class="n">HANDLE</span> <span class="n">hPool</span><span class="p">,</span> <span class="n">REFCLSID</span> <span class="n">rclsid</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">riid</span><span class="p">,</span> <span class="n">LPVOID</span><span class="o">*</span> <span class="n">ppv</span><span class="p">);</span>
+
+<span class="n">BSTR</span>        <span class="n">PoolAppendString</span>        <span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">,</span> <span class="n">BSTR</span> <span class="n">string</span><span class="p">,</span> <span class="n">BSTR</span> <span class="n">append</span><span class="p">);</span>
+<span class="n">LPVOID</span>      <span class="n">PoolAllocMemory</span>         <span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">,</span> <span class="n">SIZE_T</span> <span class="n">sSize</span><span class="p">);</span>
+<span class="n">LISTNODE</span><span class="o">*</span>   <span class="n">PoolLinkAfter</span>           <span class="p">(</span><span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNode</span><span class="p">,</span> <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pAfter</span><span class="p">);</span>
+<span class="n">LISTNODE</span><span class="o">*</span>   <span class="n">PoolLinkBefore</span>          <span class="p">(</span><span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNode</span><span class="p">,</span> <span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pBefore</span><span class="p">);</span>
+<span class="n">LISTNODE</span><span class="o">*</span>   <span class="n">PoolUnlink</span>              <span class="p">(</span><span class="n">LISTNODE</span><span class="o">*</span> <span class="n">pNode</span><span class="p">);</span>
+<span class="kt">void</span>        <span class="n">PoolFreePool</span>            <span class="p">(</span><span class="n">HANDLE</span> <span class="n">hListPool</span><span class="p">);</span>
+</pre></div>
+</pre></div></td>
+        </tr>
+      
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

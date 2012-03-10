@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ComponentObjectModel.h</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+  <table cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th class="docs"><h1>ComponentObjectModel.h</th>
+        <th class="code"></th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="n">BOOLEAN</span>
+<span class="n">IsIIDImplemented</span><span class="p">(</span><span class="n">REFIID</span> <span class="n">riid</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">ariidImplemented</span><span class="p">[]);</span>
+
+<span class="kt">void</span> <span class="n">NO_DESTRUCTOR</span><span class="p">(</span><span class="n">LPVOID</span> <span class="n">pObject</span><span class="p">);</span>
+
+<span class="kt">void</span> <span class="n">COM_Destroying</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="n">pClass</span><span class="p">,</span> <span class="kt">char</span> <span class="o">*</span><span class="n">name</span><span class="p">);</span>
+
+<span class="cp">#define QUERY_INTERFACE(Interface, iids)                    \</span>
+<span class="cp">static HRESULT STDMETHODCALLTYPE                            \</span>
+<span class="cp">Interface ## _QueryInterface                                  \</span>
+<span class="cp">    ( Interface *pSelf, REFIID riid, void **ppv)     \</span>
+<span class="cp">{                                                           \</span>
+<span class="cp">    if (IsIIDImplemented(riid, iids ))                      \</span>
+<span class="cp">    {                                                       \</span>
+<span class="cp">        *ppv = pSelf;                                       \</span>
+<span class="cp">        pSelf-&gt;lpVtbl-&gt;AddRef(pSelf);                       \</span>
+<span class="cp">        return S_OK;                                        \</span>
+<span class="cp">    }                                                       \</span>
+<span class="cp">    else                                                    \</span>
+<span class="cp">    {                                                       \</span>
+<span class="cp">        *ppv = NULL;                                        \</span>
+<span class="cp">        return E_NOINTERFACE;                               \</span>
+<span class="cp">    }                                                       \</span>
+<span class="cp">}</span>
+
+<span class="cp">#define REFERENCE_COUNT(Interface, Class, LockCount, Destructor)        \</span>
+<span class="cp">static ULONG STDMETHODCALLTYPE                              \</span>
+<span class="cp">Interface ## _AddRef( Interface *pSelf)                        \</span>
+<span class="cp">{                                                           \</span>
+<span class="cp">    Class *pClass = ( Class *) pSelf;                         \</span>
+<span class="cp">    return ++pClass-&gt;dwCount;                               \</span>
+<span class="cp">}                                                           \</span>
+<span class="cp">                                                     \</span>
+<span class="cp">static ULONG STDMETHODCALLTYPE                              \</span>
+<span class="cp">Interface ## _Release( Interface *pSelf)                       \</span>
+<span class="cp">{                                                           \</span>
+<span class="cp">    Class *pClass = ( Class *) pSelf;                         \</span>
+<span class="cp">    DWORD dwCount;                         \</span>
+<span class="cp">    if ((dwCount = --pClass-&gt;dwCount) == 0)                        \</span>
+<span class="cp">    {                                                       \</span>
+<span class="cp">        COM_Destroying( pClass, #Interface );                \</span>
+<span class="cp">        Destructor(pClass);                                 \</span>
+<span class="cp">        InterlockedDecrement(LockCount);                    \</span>
+<span class="cp">        GlobalFree(pClass);                                 \</span>
+<span class="cp">    }                                                       \</span>
+<span class="cp">    return dwCount;                                         \</span>
+<span class="cp">}</span>
+</pre></div>
+</pre></div></td>
+        </tr>
+      
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

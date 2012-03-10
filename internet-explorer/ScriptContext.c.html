@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ScriptContext.c</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
+</head>
+<body>
+<div id="container">
+<div id="background"></div>
+  <table cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th class="docs"><h1>ScriptContext.c</th>
+        <th class="code"></th>
+      </tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="cp">#include &quot;stdafx.h&quot;</span>
+
+<span class="cp">#include &quot;Log.h&quot;</span>
+<span class="cp">#include &quot;GenericFactory.h&quot;</span>
+<span class="cp">#include &quot;ComponentObjectModel.h&quot;</span>
+<span class="cp">#include &quot;ScriptContext.h&quot;</span>
+
+<span class="c1">// {7CD57D42-C553-4B82-A52A-513082F57EE0}</span>
+<span class="c1">// DEFINE_GUID(CLSID_ScriptContext,</span>
+<span class="c1">// 0x7cd57d42, 0xc553, 0x4b82, 0xa5, 0x2a, 0x51, 0x30, 0x82, 0xf5, 0x7e, 0xe0);</span>
+
+<span class="c1">// {7CD57D42-C553-4B82-A52A-513082F57EE0}</span>
+<span class="k">const</span> <span class="n">GUID</span> <span class="n">CLSID_ScriptContext</span> <span class="o">=</span> 
+<span class="p">{</span> <span class="mh">0x7cd57d42</span><span class="p">,</span> <span class="mh">0xc553</span><span class="p">,</span> <span class="mh">0x4b82</span><span class="p">,</span>
+    <span class="p">{</span> <span class="mh">0xa5</span><span class="p">,</span> <span class="mh">0x2a</span><span class="p">,</span> <span class="mh">0x51</span><span class="p">,</span> <span class="mh">0x30</span><span class="p">,</span> <span class="mh">0x82</span><span class="p">,</span> <span class="mh">0xf5</span><span class="p">,</span> <span class="mh">0x7e</span><span class="p">,</span> <span class="mh">0xe0</span> <span class="p">}</span> <span class="p">};</span>
+
+<span class="c1">// {06ADED5A-6532-4112-96EC-22FD8BA69BCF}</span>
+<span class="k">static</span> <span class="k">const</span> <span class="n">GUID</span> <span class="n">IID_IScriptContext</span> <span class="o">=</span> 
+<span class="p">{</span> <span class="mh">0x6aded5a</span><span class="p">,</span> <span class="mh">0x6532</span><span class="p">,</span> <span class="mh">0x4112</span><span class="p">,</span> <span class="p">{</span> <span class="mh">0x96</span><span class="p">,</span> <span class="mh">0xec</span><span class="p">,</span> <span class="mh">0x22</span><span class="p">,</span> <span class="mh">0xfd</span><span class="p">,</span> <span class="mh">0x8b</span><span class="p">,</span> <span class="mh">0xa6</span><span class="p">,</span> <span class="mh">0x9b</span><span class="p">,</span> <span class="mh">0xcf</span> <span class="p">}</span> <span class="p">};</span>
+
+
+<span class="c1">// {9753946F-58D1-46DC-BAB1-321C00ABD037}</span>
+<span class="k">static</span> <span class="k">const</span> <span class="n">GUID</span> <span class="n">CLSID_TypeLibrary</span> <span class="o">=</span> 
+<span class="p">{</span> <span class="mh">0x9753946f</span><span class="p">,</span> <span class="mh">0x58d1</span><span class="p">,</span> <span class="mh">0x46dc</span><span class="p">,</span>
+    <span class="p">{</span> <span class="mh">0xba</span><span class="p">,</span> <span class="mh">0xb1</span><span class="p">,</span> <span class="mh">0x32</span><span class="p">,</span> <span class="mh">0x1c</span><span class="p">,</span> <span class="mh">0x0</span><span class="p">,</span> <span class="mh">0xab</span><span class="p">,</span> <span class="mh">0xd0</span><span class="p">,</span> <span class="mh">0x37</span> <span class="p">}</span> <span class="p">};</span>
+
+<span class="k">struct</span> <span class="n">InjectionMap</span>
+<span class="p">{</span>
+    <span class="n">CRITICAL_SECTION</span> <span class="n">csInjections</span><span class="p">;</span>
+    <span class="n">BSTR</span> <span class="n">bstrInjections</span><span class="p">;</span>
+<span class="p">};</span>
+<span class="k">static</span> <span class="k">struct</span> <span class="n">InjectionMap</span> <span class="n">InjectionMap</span><span class="p">;</span>
+
+<span class="k">static</span> <span class="n">DWORD</span> <span class="o">*</span><span class="n">pdwLockCount</span><span class="p">;</span>
+
+<span class="k">static</span> <span class="n">REFIID</span> <span class="n">ariidImplemented</span><span class="p">[]</span> <span class="o">=</span>
+<span class="p">{</span>
+    <span class="o">&amp;</span><span class="n">IID_IUnknown</span><span class="p">,</span>
+    <span class="o">&amp;</span><span class="n">IID_IDispatch</span><span class="p">,</span>
+    <span class="o">&amp;</span><span class="n">IID_IScriptContext</span><span class="p">,</span>
+    <span class="nb">NULL</span>
+<span class="p">};</span>
+
+
+<span class="n">REFERENCE_COUNT</span><span class="p">(</span><span class="n">IScriptContext</span><span class="p">,</span> <span class="n">ScriptContext</span><span class="p">,</span> <span class="n">pdwLockCount</span><span class="p">,</span> <span class="n">NO_DESTRUCTOR</span><span class="p">)</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>FIXME: Now use our common QUERY_INTERFACE. </p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="n">IScriptContext_QueryInterface</span><span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">riid</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="n">ppv</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">ScriptContext</span> <span class="o">*</span><span class="n">pScriptContext</span> <span class="o">=</span> <span class="p">(</span><span class="n">ScriptContext</span><span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">IsIIDImplemented</span><span class="p">(</span><span class="n">riid</span><span class="p">,</span> <span class="n">ariidImplemented</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="o">*</span><span class="n">ppv</span> <span class="o">=</span> <span class="n">pSelf</span><span class="p">;</span>
+        <span class="n">pSelf</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">AddRef</span><span class="p">(</span><span class="n">pSelf</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="o">*</span><span class="n">ppv</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">E_NOINTERFACE</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Does not provide an actual count. Return a value of <code>1</code> through the integer
+pointer to indicate that type info is provided. (Does not provide an actual
+count](http://msdn.microsoft.com/en-us/library/aa910538.aspx) of any kind.</p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="n">IScriptContext_GetTypeInfoCount</span><span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">UINT</span> <span class="o">*</span><span class="n">pctinfo</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="o">*</span><span class="n">pctinfo</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">LPTYPEINFO</span> <span class="n">TypeInfo</span><span class="p">;</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="nf">loadTypeInfo</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span><span class="p">;</span>
+    <span class="n">LPTYPELIB</span> <span class="n">pTLib</span><span class="p">;</span>
+    <span class="n">BSTR</span> <span class="n">rgNames</span><span class="p">[</span><span class="mi">128</span><span class="p">];</span>
+    <span class="n">UINT</span> <span class="n">cNames</span> <span class="o">=</span> <span class="mi">128</span><span class="p">,</span> <span class="n">cActualNames</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">LoadRegTypeLib</span><span class="p">(</span><span class="o">&amp;</span><span class="n">CLSID_TypeLibrary</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pTLib</span><span class="p">)))</span>
+    <span class="p">{</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">pTLib</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">GetTypeInfoOfGuid</span><span class="p">(</span><span class="n">pTLib</span><span class="p">,</span>
+            <span class="o">&amp;</span><span class="n">IID_IScriptContext</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">TypeInfo</span><span class="p">);</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Release the temporary type info now owned by the default
+type info. </p></td>
+          <td class="code"><div class="highlight"><pre>
+        <span class="n">pTLib</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pTLib</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="n">TypeInfo</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">GetNames</span><span class="p">(</span><span class="n">TypeInfo</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">rgNames</span><span class="p">,</span> <span class="n">cNames</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">cActualNames</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Type info is loaded from out type definition. </p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_GetTypeInfo</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">UINT</span> <span class="n">iTInfo</span><span class="p">,</span> <span class="n">LCID</span> <span class="n">lcid</span><span class="p">,</span> <span class="n">ITypeInfo</span> <span class="o">**</span> <span class="n">ppTInfo</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span><span class="p">;</span>
+
+    <span class="o">*</span><span class="n">ppTInfo</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">iTInfo</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">ResultFromScode</span><span class="p">(</span><span class="n">DISP_E_BADINDEX</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">TypeInfo</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">hr</span> <span class="o">=</span> <span class="n">loadTypeInfo</span><span class="p">();</span>
+        <span class="p">}</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Increment the reference count to the type library we've loaded,
+because the caller will release it once. </p></td>
+          <td class="code"><div class="highlight"><pre>
+        <span class="k">if</span> <span class="p">(</span><span class="n">TypeInfo</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">TypeInfo</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">AddRef</span><span class="p">(</span><span class="n">TypeInfo</span><span class="p">);</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_GetIDsOfNames</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">refiid</span><span class="p">,</span> <span class="n">LPOLESTR</span> <span class="o">*</span><span class="n">rgszNames</span><span class="p">,</span>
+        <span class="n">UINT</span> <span class="n">cNames</span><span class="p">,</span> <span class="n">LCID</span> <span class="n">lcid</span><span class="p">,</span> <span class="n">DISPID</span> <span class="o">*</span><span class="n">rgDispId</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">TypeInfo</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">loadTypeInfo</span><span class="p">()))</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="n">hr</span><span class="p">;</span> 
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">DispGetIDsOfNames</span><span class="p">(</span><span class="n">TypeInfo</span><span class="p">,</span> <span class="n">rgszNames</span><span class="p">,</span> <span class="n">cNames</span><span class="p">,</span> <span class="n">rgDispId</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">ULONG</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_Invoke</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">DISPID</span> <span class="n">dispIdNumber</span><span class="p">,</span> <span class="n">REFIID</span> <span class="n">refiid</span><span class="p">,</span>
+        <span class="n">LCID</span> <span class="n">lcid</span><span class="p">,</span> <span class="n">WORD</span> <span class="n">wFlags</span><span class="p">,</span> <span class="n">DISPPARAMS</span> <span class="o">*</span><span class="n">pDispParams</span><span class="p">,</span> <span class="n">VARIANT</span> <span class="o">*</span><span class="n">pVarResult</span><span class="p">,</span>
+        <span class="n">EXCEPINFO</span> <span class="o">*</span><span class="n">pExcepInfo</span><span class="p">,</span> <span class="n">UINT</span> <span class="o">*</span><span class="n">puArgErr</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">HRESULT</span> <span class="n">hr</span><span class="p">;</span>
+    <span class="n">VARIANT</span> <span class="n">vResult</span><span class="p">;</span>
+
+    <span class="n">VariantInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vResult</span><span class="p">);</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">IsEqualIID</span><span class="p">(</span><span class="n">refiid</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">IID_NULL</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="n">DISP_E_UNKNOWNINTERFACE</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">TypeInfo</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="n">hr</span> <span class="o">=</span> <span class="n">loadTypeInfo</span><span class="p">()))</span>
+    <span class="p">{</span>
+        <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">DispInvoke</span><span class="p">(</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">TypeInfo</span><span class="p">,</span> <span class="n">dispIdNumber</span><span class="p">,</span> <span class="n">wFlags</span><span class="p">,</span> <span class="n">pDispParams</span><span class="p">,</span> <span class="n">pVarResult</span><span class="p">,</span> <span class="n">pExcepInfo</span><span class="p">,</span> <span class="n">puArgErr</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_SetURL</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">BSTR</span> <span class="n">bstrURL</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">ScriptContext</span> <span class="o">*</span><span class="n">pScriptContext</span> <span class="o">=</span> <span class="p">(</span><span class="n">ScriptContext</span> <span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;SetURL %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">bstrURL</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">bstrURL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">SysFreeString</span><span class="p">(</span><span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">bstrURL</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">bstrURL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">bstrURL</span> <span class="o">=</span> <span class="n">SysAllocString</span><span class="p">((</span><span class="n">OLECHAR</span><span class="o">*</span><span class="p">)</span> <span class="n">bstrURL</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">bstrURL</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_GetURL</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">BSTR</span> <span class="o">*</span><span class="n">pbstrURL</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">ScriptContext</span> <span class="o">*</span><span class="n">pScriptContext</span> <span class="o">=</span> <span class="p">(</span><span class="n">ScriptContext</span> <span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">bstrURL</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="o">*</span><span class="n">pbstrURL</span> <span class="o">=</span> <span class="n">SysAllocString</span><span class="p">((</span><span class="n">OLECHAR</span><span class="o">*</span><span class="p">)</span> <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">bstrURL</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="o">*</span><span class="n">pbstrURL</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;GetURL %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">pbstrURL</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_SetInjections</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">BSTR</span> <span class="n">bstrInjections</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;SetInjections %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">bstrInjections</span><span class="p">);</span>
+    <span class="n">EnterCriticalSection</span><span class="p">(</span><span class="o">&amp;</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">csInjections</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">bstrInjections</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">SysFreeString</span><span class="p">(</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">bstrInjections</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">bstrInjections</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">InjectionMap</span><span class="p">.</span><span class="n">bstrInjections</span> <span class="o">=</span> <span class="n">SysAllocString</span><span class="p">((</span><span class="n">OLECHAR</span><span class="o">*</span><span class="p">)</span> <span class="n">bstrInjections</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="n">InjectionMap</span><span class="p">.</span><span class="n">bstrInjections</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">LeaveCriticalSection</span><span class="p">(</span><span class="o">&amp;</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">csInjections</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_GetInjections</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">BSTR</span> <span class="o">*</span><span class="n">pbstrInjections</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">EnterCriticalSection</span><span class="p">(</span><span class="o">&amp;</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">csInjections</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">bstrInjections</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="o">*</span><span class="n">pbstrInjections</span> <span class="o">=</span> <span class="n">SysAllocString</span><span class="p">((</span><span class="n">OLECHAR</span><span class="o">*</span><span class="p">)</span> <span class="n">InjectionMap</span><span class="p">.</span><span class="n">bstrInjections</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="o">*</span><span class="n">pbstrInjections</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">LeaveCriticalSection</span><span class="p">(</span><span class="o">&amp;</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">csInjections</span><span class="p">);</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;GetInjections %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">pbstrInjections</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_SetDocument</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">IDispatch</span> <span class="o">*</span><span class="n">pDocument</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">ScriptContext</span> <span class="o">*</span><span class="n">pScriptContext</span> <span class="o">=</span> <span class="p">(</span><span class="n">ScriptContext</span><span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;SET DOCUMENT</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pDocument</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pDocument</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pDocument</span><span class="p">);</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pDocument</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pDocument</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pDocument</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">AddRef</span><span class="p">(</span><span class="n">pDocument</span><span class="p">);</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pDocument</span> <span class="o">=</span> <span class="n">pDocument</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_GetDocument</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">IDispatch</span> <span class="o">**</span><span class="n">ppDocument</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">ScriptContext</span> <span class="o">*</span><span class="n">pScriptContext</span> <span class="o">=</span> <span class="p">(</span><span class="n">ScriptContext</span><span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+    <span class="n">IDispatch</span> <span class="o">*</span><span class="n">pDocument</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pDocument</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">pDocument</span> <span class="o">=</span> <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pDocument</span><span class="p">;</span>
+        <span class="n">pDocument</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">AddRef</span><span class="p">(</span><span class="n">pDocument</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;GET DOCUMENT: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">pDocument</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">);</span>
+    <span class="o">*</span><span class="n">ppDocument</span> <span class="o">=</span> <span class="n">pDocument</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Testing with a bogus object shows that the caller will decrement the
+reference once, without incrementing it, so if we do not increase the
+reference count, the script engine will send the reference count to zero,
+thereby releasing the XHR. </p></td>
+          <td class="code"><div class="highlight"><pre>
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_CreateXHR</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">IDispatch</span><span class="o">**</span> <span class="n">ppIDispatch</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;CreateXHR.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">CoCreateInstance</span><span class="p">(</span><span class="o">&amp;</span><span class="n">CLSID_XMLHTTPRequest</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">CLSCTX_INPROC_SERVER</span><span class="p">,</span>
+        <span class="o">&amp;</span><span class="n">IID_IDispatch</span><span class="p">,</span> <span class="n">ppIDispatch</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_Injector</span> <span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">BSTR</span> <span class="n">bstrInjector</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">DWORD</span> <span class="n">dwCount</span><span class="p">;</span>
+    <span class="n">ScriptContext</span> <span class="o">*</span><span class="n">pScriptContext</span> <span class="o">=</span> <span class="p">(</span><span class="n">ScriptContext</span><span class="o">*</span><span class="p">)</span> <span class="n">pSelf</span><span class="p">;</span>
+    <span class="n">IActiveScript</span> <span class="o">*</span><span class="n">pActiveScript</span> <span class="o">=</span> <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pActiveScript</span><span class="p">;</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;Injector! %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">pActiveScript</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">);</span>
+    <span class="n">pActiveScript</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Close</span><span class="p">(</span><span class="n">pActiveScript</span><span class="p">);</span>
+    <span class="n">dwCount</span> <span class="o">=</span> <span class="n">pActiveScript</span><span class="o">-&gt;</span><span class="n">lpVtbl</span><span class="o">-&gt;</span><span class="n">Release</span><span class="p">(</span><span class="n">pActiveScript</span><span class="p">);</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;Injector: %d.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">dwCount</span><span class="p">);</span>
+    <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pActiveScript</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_Log</span><span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">BSTR</span> <span class="n">bstrMessage</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">Log</span><span class="p">(</span><span class="s">L&quot;%s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">bstrMessage</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
+<span class="nf">IScriptContext_CreateObservable</span><span class="p">(</span><span class="n">IScriptContext</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">IDispatch</span><span class="o">**</span> <span class="n">ppIDispatch</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">GenericFactory_CreateInstance</span><span class="p">(</span><span class="s">L&quot;{3C8C461C-5543-468A-A0D2-334C6B6E54E8}&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">IID_IDispatch</span><span class="p">,</span> <span class="n">ppIDispatch</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">IScriptContextVtbl</span> <span class="n">ScriptContextVtbl</span> <span class="o">=</span>
+<span class="p">{</span>
+    <span class="n">IScriptContext_QueryInterface</span><span class="p">,</span>
+    <span class="n">IScriptContext_AddRef</span><span class="p">,</span>
+    <span class="n">IScriptContext_Release</span><span class="p">,</span>
+    <span class="n">IScriptContext_GetTypeInfoCount</span><span class="p">,</span>
+    <span class="n">IScriptContext_GetTypeInfo</span><span class="p">,</span>
+    <span class="n">IScriptContext_GetIDsOfNames</span><span class="p">,</span>
+    <span class="n">IScriptContext_Invoke</span><span class="p">,</span>
+    <span class="n">IScriptContext_SetURL</span><span class="p">,</span>
+    <span class="n">IScriptContext_GetURL</span><span class="p">,</span>
+    <span class="n">IScriptContext_SetInjections</span><span class="p">,</span>
+    <span class="n">IScriptContext_GetInjections</span><span class="p">,</span>
+    <span class="n">IScriptContext_SetDocument</span><span class="p">,</span>
+    <span class="n">IScriptContext_GetDocument</span><span class="p">,</span>
+    <span class="n">IScriptContext_CreateXHR</span><span class="p">,</span>
+    <span class="n">IScriptContext_Injector</span><span class="p">,</span>
+    <span class="n">IScriptContext_Log</span><span class="p">,</span>
+    <span class="n">IScriptContext_CreateObservable</span>
+<span class="p">};</span>
+
+<span class="c1">// Create an instance of the Verity browser helper object.</span>
+<span class="k">static</span> <span class="n">HRESULT</span>
+<span class="nf">ScriptContext_CreateInstance</span><span class="p">(</span>
+    <span class="n">REFIID</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="n">ppv</span>
+<span class="p">)</span> <span class="p">{</span>
+    <span class="n">HRESULT</span>              <span class="n">hr</span><span class="p">;</span>
+    <span class="n">ScriptContext</span>       <span class="o">*</span><span class="n">pScriptContext</span><span class="p">;</span>
+
+    <span class="c1">// Allocate the memory for the Verity browser helper object.</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">pScriptContext</span> <span class="o">=</span> <span class="n">GlobalAlloc</span><span class="p">(</span><span class="n">GMEM_FIXED</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">ScriptContext</span><span class="p">))))</span>
+    <span class="p">{</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">E_OUTOFMEMORY</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">else</span>
+    <span class="p">{</span>
+        <span class="c1">// Set the virtual function table and reference count.</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">lpVtbl</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">ScriptContextVtbl</span><span class="p">;</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">dwCount</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">bstrURL</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pDocument</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="n">pScriptContext</span><span class="o">-&gt;</span><span class="n">pActiveScript</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+
+        <span class="c1">// Increment the library lock count.</span>
+        <span class="n">InterlockedIncrement</span><span class="p">(</span><span class="n">pdwLockCount</span><span class="p">);</span>
+
+        <span class="c1">// Now use QueryInterface to set the caller&#39;s result pointer.</span>
+        <span class="c1">// QueryInterface will also check that request interface is the</span>
+        <span class="c1">// one supported by our Verity browser helper object.</span>
+        <span class="n">hr</span> <span class="o">=</span> <span class="n">ScriptContextVtbl</span><span class="p">.</span><span class="n">QueryInterface</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">IScriptContext</span><span class="o">*</span><span class="p">)</span> <span class="n">pScriptContext</span><span class="p">,</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="n">ppv</span><span class="p">);</span>
+
+        <span class="c1">// If we had a problem above, then the reference count is still</span>
+        <span class="c1">// one, so decrementing it will free the memory we just allocated,</span>
+        <span class="c1">// otherwise, it is two and decrementing it makes it as it should</span>
+        <span class="c1">// be.</span>
+        <span class="n">ScriptContextVtbl</span><span class="p">.</span><span class="n">Release</span><span class="p">((</span><span class="n">IScriptContext</span><span class="o">*</span><span class="p">)</span> <span class="n">pScriptContext</span><span class="p">);</span>
+
+        <span class="o">*</span><span class="n">ppv</span> <span class="o">=</span> <span class="n">pScriptContext</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span>
+<span class="nf">ScriptContext_Finalize</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="n">EnterCriticalSection</span><span class="p">(</span><span class="o">&amp;</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">csInjections</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">bstrInjections</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">SysFreeString</span><span class="p">(</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">bstrInjections</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="n">LeaveCriticalSection</span><span class="p">(</span><span class="o">&amp;</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">csInjections</span><span class="p">);</span>
+    <span class="n">DeleteCriticalSection</span><span class="p">(</span><span class="o">&amp;</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">csInjections</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">HRESULT</span>
+<span class="nf">ScriptContext_CreateFactory</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="n">InitializeCriticalSection</span><span class="p">(</span><span class="o">&amp;</span><span class="n">InjectionMap</span><span class="p">.</span><span class="n">csInjections</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">GenericFactory_CreateFactory</span><span class="p">(</span><span class="o">&amp;</span><span class="n">CLSID_ScriptContext</span><span class="p">,</span> <span class="n">ScriptContext_CreateInstance</span><span class="p">,</span> <span class="n">ScriptContext_Finalize</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pdwLockCount</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</pre></div></td>
+        </tr>
+      
+    </tbody>
+  </table>
+</div>
+</body>
+</html>
