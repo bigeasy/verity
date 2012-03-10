@@ -6,7 +6,6 @@
 #include "ComponentObjectModel.h"
 #include "ScriptContext.h"
 #include "ActiveScriptSite.h"
-#include "Pool.h"
 #include <Winhttp.h>
 
 static DWORD *pdwLockCount;
