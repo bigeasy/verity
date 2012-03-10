@@ -209,9 +209,6 @@ function createCompiler(options, base) {
         case "when": 
           addInjection(options, base, match[2]);
           break;
-        case "expect":
-          when = parseInt(match[2].trim());
-          break;
         case "include":
           break;
         default:
