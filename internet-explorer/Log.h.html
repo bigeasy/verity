@@ -3,7 +3,7 @@
 <head>
 <title>Log.h</title>
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
-<link rel="stylesheet" media="all" href="/verity/css/docco.css">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
 </head>
 <body>
 <div id="container">
@@ -18,7 +18,9 @@
     <tbody>
       
         <tr>
-          <td class="docs"></td>
+          <td class="docs"><p>TODO: These need to log in the directory in which the DLL is installed,
+right? There or else a temporary directory, the install directory is not
+writable. Where do you write log files? </p></td>
           <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="kt">void</span> <span class="n">Log</span><span class="p">(</span><span class="k">const</span> <span class="n">TCHAR</span><span class="o">*</span><span class="p">,</span> <span class="p">...);</span>
 <span class="kt">void</span> <span class="n">WriteLog</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">message</span><span class="p">);</span>
 <span class="kt">void</span> <span class="n">TWriteLog</span><span class="p">(</span><span class="k">const</span> <span class="n">TCHAR</span><span class="o">*</span> <span class="n">message</span><span class="p">);</span>

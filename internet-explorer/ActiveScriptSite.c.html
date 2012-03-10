@@ -3,7 +3,7 @@
 <head>
 <title>ActiveScriptSite.c</title>
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
-<link rel="stylesheet" media="all" href="/verity/css/docco.css">
+<link rel="stylesheet" media="all" href="/attendant/css/docco.css">
 </head>
 <body>
 <div id="container">
@@ -20,18 +20,52 @@
         <tr>
           <td class="docs"><p>System includes are in the precompiled header file. </p></td>
           <td class="code"><div class="highlight"><pre><div class="highlight"><pre><span class="cp">#include &quot;stdafx.h&quot;</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Common project includes. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="cp">#include &quot;Log.h&quot;</span>
 <span class="cp">#include &quot;ComponentObjectModel.h&quot;</span>
 <span class="cp">#include &quot;GenericFactory.h&quot;</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>The <code>ActiveScriptSite</code> object contains a <code>ScriptContext</code>. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="cp">#include &quot;ScriptContext.h&quot;</span>
 <span class="cp">#include &quot;ActiveScriptSite.h&quot;</span>
 
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>The class GUID for <code>ActiveScriptSite</code> our implementation of
+<code>IActiveScriptSite</code>. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="c1">// {73C6AB50-2BEE-4DC0-AB1C-910C255D1C23}</span>
  <span class="k">const</span> <span class="n">GUID</span> <span class="n">CLSID_ActiveScriptSite</span> <span class="o">=</span>
 <span class="p">{</span> <span class="mh">0x73c6ab50</span><span class="p">,</span> <span class="mh">0x2bee</span><span class="p">,</span> <span class="mh">0x4dc0</span><span class="p">,</span> <span class="p">{</span> <span class="mh">0xab</span><span class="p">,</span> <span class="mh">0x1c</span><span class="p">,</span> <span class="mh">0x91</span><span class="p">,</span> <span class="mh">0xc</span><span class="p">,</span> <span class="mh">0x25</span><span class="p">,</span> <span class="mh">0x5d</span><span class="p">,</span> <span class="mh">0x1c</span><span class="p">,</span> <span class="mh">0x23</span> <span class="p">}</span> <span class="p">};</span>
 
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>A count of outstanding objects used to track whether the library can be
+unloaded. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">DWORD</span> <span class="o">*</span><span class="n">pdwLockCount</span><span class="p">;</span>
 
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Interfaces implemented by the <code>ActiveScriptSite</code> object. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">REFIID</span> <span class="n">ariidImplemented</span><span class="p">[]</span> <span class="o">=</span>
 <span class="p">{</span>
     <span class="o">&amp;</span><span class="n">IID_IUnknown</span><span class="p">,</span>
@@ -39,16 +73,38 @@
     <span class="nb">NULL</span>
 <span class="p">};</span>
 
-
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Boilerplate implementation if <code>IUnknown</code>. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="n">QUERY_INTERFACE</span><span class="p">(</span><span class="n">IActiveScriptSite</span><span class="p">,</span> <span class="n">ariidImplemented</span><span class="p">)</span>
 <span class="n">REFERENCE_COUNT</span><span class="p">(</span><span class="n">IActiveScriptSite</span><span class="p">,</span> <span class="n">ActiveScriptSite</span><span class="p">,</span> <span class="n">pdwLockCount</span><span class="p">,</span> <span class="n">NO_DESTRUCTOR</span><span class="p">)</span>
 
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>We don't really have a need i18n support in this plugin. When the time comes,
+we'll implement it using HTML and JavaScript. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
 <span class="n">IActiveScriptSite_GetLCID</span><span class="p">(</span><span class="n">IActiveScriptSite</span> <span class="o">*</span><span class="n">site</span><span class="p">,</span> <span class="n">LCID</span> <span class="o">*</span><span class="n">plcid</span><span class="p">)</span>
 <span class="p">{</span>
     <span class="k">return</span> <span class="n">E_NOTIMPL</span><span class="p">;</span>
 <span class="p">}</span>
         
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>We expose a <code>verity</code> object in the global namespace of the script. The
+<code>verity</code> object is an instance of the <code>ScriptContext</code> object. Implemented
+according to the fabulous instruction in <a href="http://www.codeproject.com/Articles/15037/COM-in-plain-C-Part-7#REG">COM In Plain C, Part
+7</a> by
+Jeff Glatt. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
 <span class="n">IActiveScriptSite_GetItemInfo</span><span class="p">(</span>
     <span class="n">IActiveScriptSite</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">LPCOLESTR</span> <span class="n">pstrName</span><span class="p">,</span> <span class="n">DWORD</span> <span class="n">dwReturnMask</span><span class="p">,</span>
@@ -78,12 +134,27 @@
     <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
 <span class="p">}</span>
         
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Used to track changes to the script source for recompilation. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
 <span class="n">IActiveScriptSite_GetDocVersionString</span><span class="p">(</span><span class="n">IActiveScriptSite</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">BSTR</span> <span class="o">*</span><span class="n">pbstrVersion</span><span class="p">)</span>
 <span class="p">{</span>
-    <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">E_NOTIMPL</span><span class="p">;</span>
 <span class="p">}</span>
         
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Used this at one point to harvest the generated test script, but the Active
+Scripting engines do not terminate when the last instruction is executed, nor
+when the last outstanding callback is invoked, ala Node.js. They count on the
+host to terminate the script. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
 <span class="n">IActiveScriptSite_OnScriptTerminate</span><span class="p">(</span>
     <span class="n">IActiveScriptSite</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="k">const</span> <span class="n">VARIANT</span> <span class="o">*</span><span class="n">pvarResult</span><span class="p">,</span> <span class="k">const</span> <span class="n">EXCEPINFO</span> <span class="o">*</span><span class="n">pexcepinfo</span>
@@ -92,12 +163,26 @@
     <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
 <span class="p">}</span>
         
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>State changes. Not interested. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
 <span class="n">IActiveScriptSite_OnStateChange</span><span class="p">(</span><span class="n">IActiveScriptSite</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">SCRIPTSTATE</span> <span class="n">ssScriptState</span><span class="p">)</span>
 <span class="p">{</span>
     <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
 <span class="p">}</span>
         
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Our scripts are static. Errors raised are bugs that need to be filed and
+fixed. There is nothing for the user to do. We log our errors in an error log
+in the DLL directory. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
 <span class="n">IActiveScriptSite_OnScriptError</span><span class="p">(</span><span class="n">IActiveScriptSite</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">,</span> <span class="n">IActiveScriptError</span> <span class="o">*</span><span class="n">pScriptError</span><span class="p">)</span>
 <span class="p">{</span>
@@ -125,18 +210,36 @@
     <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
 <span class="p">}</span>
         
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>More uninteresting events. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
 <span class="n">IActiveScriptSite_OnEnterScript</span><span class="p">(</span><span class="n">IActiveScriptSite</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">)</span>
 <span class="p">{</span>
     <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
 <span class="p">}</span>
         
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>More uninteresting events. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">HRESULT</span> <span class="n">STDMETHODCALLTYPE</span>
 <span class="n">IActiveScriptSite_OnLeaveScript</span><span class="p">(</span><span class="n">IActiveScriptSite</span> <span class="o">*</span><span class="n">pSelf</span><span class="p">)</span>
 <span class="p">{</span>
     <span class="k">return</span> <span class="n">S_OK</span><span class="p">;</span>
 <span class="p">}</span>
 
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Virtual table for our <code>IActiveScriptSite</code> implementation. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="n">IActiveScriptSiteVtbl</span> <span class="n">ActiveScriptSiteVtbl</span> <span class="o">=</span>
 <span class="p">{</span>
     <span class="n">IActiveScriptSite_QueryInterface</span><span class="p">,</span>
@@ -152,7 +255,12 @@
     <span class="n">IActiveScriptSite_OnLeaveScript</span>
 <span class="p">};</span>
 
-<span class="c1">// Create an instance of the Verity browser helper object.</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Constructor for our <code>IActiveScriptSite</code> implementation. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="k">static</span> <span class="n">HRESULT</span>
 <span class="nf">ActiveScriptSite_CreateInstance</span><span class="p">(</span>
     <span class="n">REFIID</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="kt">void</span> <span class="o">**</span><span class="n">ppv</span>
@@ -160,39 +268,83 @@
     <span class="n">HRESULT</span>              <span class="n">hr</span><span class="p">;</span>
     <span class="n">ActiveScriptSite</span>    <span class="o">*</span><span class="n">pActiveScriptSite</span><span class="p">;</span>
 
-    <span class="c1">// Allocate the memory for the Verity browser helper object.</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Allocate memory </p></td>
+          <td class="code"><div class="highlight"><pre>
     <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">pActiveScriptSite</span> <span class="o">=</span> <span class="n">GlobalAlloc</span><span class="p">(</span><span class="n">GMEM_FIXED</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">ActiveScriptSite</span><span class="p">))))</span>
     <span class="p">{</span>
         <span class="n">hr</span> <span class="o">=</span> <span class="n">E_OUTOFMEMORY</span><span class="p">;</span>
     <span class="p">}</span>
     <span class="k">else</span>
     <span class="p">{</span>
-        <span class="c1">// Set the virtual function table and reference count.</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Set the virtual function table and reference count. </p></td>
+          <td class="code"><div class="highlight"><pre>
         <span class="n">pActiveScriptSite</span><span class="o">-&gt;</span><span class="n">lpVtbl</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">ActiveScriptSiteVtbl</span><span class="p">;</span>
         <span class="n">pActiveScriptSite</span><span class="o">-&gt;</span><span class="n">dwCount</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Create an instance of <code>ScriptContext</code>. </p></td>
+          <td class="code"><div class="highlight"><pre>
         <span class="n">CoCreateInstance</span><span class="p">(</span><span class="o">&amp;</span><span class="n">CLSID_ScriptContext</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">CLSCTX_INPROC_SERVER</span><span class="p">,</span>
                 <span class="o">&amp;</span><span class="n">IID_IDispatch</span><span class="p">,</span> <span class="p">(</span><span class="n">LPVOID</span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">pActiveScriptSite</span><span class="o">-&gt;</span><span class="n">pScriptContext</span><span class="p">);</span>
 
-        <span class="c1">// Increment the library lock count.</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Increment the library lock count. </p></td>
+          <td class="code"><div class="highlight"><pre>
         <span class="n">InterlockedIncrement</span><span class="p">(</span><span class="n">pdwLockCount</span><span class="p">);</span>
 
-        <span class="c1">// Now use QueryInterface to set the caller&#39;s result pointer.</span>
-        <span class="c1">// QueryInterface will also check that request interface is the</span>
-        <span class="c1">// one supported by our Verity browser helper object.</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Now use QueryInterface to set the caller's result pointer.
+QueryInterface will also check that request interface is the one
+supported by our Verity browser helper object. </p></td>
+          <td class="code"><div class="highlight"><pre>
         <span class="n">hr</span> <span class="o">=</span> <span class="n">ActiveScriptSiteVtbl</span><span class="p">.</span><span class="n">QueryInterface</span><span class="p">(</span>
                 <span class="p">(</span><span class="n">IActiveScriptSite</span><span class="o">*</span><span class="p">)</span> <span class="n">pActiveScriptSite</span><span class="p">,</span> <span class="n">guidVtbl</span><span class="p">,</span> <span class="n">ppv</span><span class="p">);</span>
 
-        <span class="c1">// If we had a problem above, then the reference count is still</span>
-        <span class="c1">// one, so decrementing it will free the memory we just allocated,</span>
-        <span class="c1">// otherwise, it is two and decrementing it makes it as it should</span>
-        <span class="c1">// be.</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>If we had a problem above, then the reference count is still
+one, so decrementing it will free the memory we just allocated,
+otherwise, it is two and decrementing it makes it as it should
+be. </p></td>
+          <td class="code"><div class="highlight"><pre>
         <span class="n">ActiveScriptSiteVtbl</span><span class="p">.</span><span class="n">Release</span><span class="p">((</span><span class="n">IActiveScriptSite</span><span class="o">*</span><span class="p">)</span> <span class="n">pActiveScriptSite</span><span class="p">);</span>
+
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre>
     <span class="p">}</span>
 
-    <span class="n">Log</span><span class="p">(</span><span class="n">_T</span><span class="p">(</span><span class="s">&quot;Allocated: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">),</span> <span class="n">hr</span><span class="p">);</span>
     <span class="k">return</span> <span class="n">hr</span><span class="p">;</span>
 <span class="p">}</span>
 
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Register our factory with the DLL entry point that serves up factories. </p></td>
+          <td class="code"><div class="highlight"><pre>
 <span class="n">HRESULT</span>
 <span class="nf">ActiveScriptSite_CreateFactory</span><span class="p">()</span>
 <span class="p">{</span>
