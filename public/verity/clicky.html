@@ -1,0 +1,18 @@
+<html>
+<head>
+<script type="text/javascript" src="/javascripts/jquery.js"></script>
+<script>
+$(function () {
+  setTimeout(function () {
+    $("#clickly").click(function () {
+        alert("Clicked!");
+    });
+    $("#clickly").trigger("click");
+  }, 1000);
+});
+</script>
+</head>
+<body>
+<a id="clickly" href="#">Clickly</a>
+</body>
+</html>

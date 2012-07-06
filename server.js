@@ -1,1 +1,6 @@
-require("./lib/verity").server()
+var connect = require("connect");
+
+var app = connect()
+  .use(connect.logger())
+  .use(connect.static('public'))
+  .listen(8078);
