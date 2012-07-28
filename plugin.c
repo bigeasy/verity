@@ -203,11 +203,12 @@ void connector(attendant__pipe_t in, attendant__pipe_t out) {
 
 NPError OSCALL NP_Initialize(NPNetscapeFuncs *browser) {
   const char *home;
-  char logfile[PATH_MAX], cubby[PATH_MAX];
+  char logfile[PATH_MAX];//, cubby[PATH_MAX];
   const char* dir;
   Dl_info library;
   struct attendant__initializer initializer;
 
+  sleep(10000);
   /* Create a log in the home directory of the current user. */
   home = getenv("HOME");
   snprintf(logfile, sizeof(logfile), "%s/verity.log", home);
@@ -354,7 +355,7 @@ bool Verity_HasProperty(NPObject *object, NPIdentifier name) {
 
 bool Verity_GetProperty(NPObject *object, NPIdentifier name, NPVariant *result) {
   bool exists = false;
-  Dl_info library;
+//  Dl_info library;
   if (npn_identifier_is_string(name)) {
     NPUTF8* string = npn_utf8_from_indentifier(name);
     say("Verity_GetProperty: %s\n", string);

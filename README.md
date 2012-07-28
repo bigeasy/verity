@@ -42,7 +42,8 @@ Surprises during OS X development: Output files put [way off in a corner
 somewhere](http://stackoverflow.com/questions/5331270/why-doesnt-xcode-4-create-any-products).
 Debugging wasn't a simple matter of attaching to Safari, because plug-ins are
 run in a separate process. The FireBreath project did the hard work of sorting
-out how to [launch a debugger on all the different platforms](o
+out how to [launch a debugger on all the different
+platforms](http://www.firebreath.org/display/documentation/Debugging+Plugins).
 
 If you do want to use XCode, you can build an XCode project. You many encounter
 a problem where [CMake cannot find the `/Developer`
