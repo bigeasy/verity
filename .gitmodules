@@ -1,6 +1,8 @@
 [submodule "vendor/attendant"]
 	path = vendor/attendant
 	url = git://github.com/bigeasy/attendant.git
+  ignore = dirty
 [submodule "vendor/cubby"]
 	path = vendor/cubby
 	url = git://github.com/bigeasy/verity.git
+  ignore = dirty
