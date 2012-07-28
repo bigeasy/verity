@@ -7,6 +7,8 @@ time being, let me entertain you with a programmer's journal.
 
 I chose CMake as my build configurator. You'll need CMake to build the project.
 
+### OS X
+
 On OS X, install cmake using homebrew. Then
 
 ```console
@@ -41,6 +43,15 @@ somewhere](http://stackoverflow.com/questions/5331270/why-doesnt-xcode-4-create-
 Debugging wasn't a simple matter of attaching to Safari, because plug-ins are
 run in a separate process. The FireBreath project did the hard work of sorting
 out how to [launch a debugger on all the different platforms](o
+
+If you do want to use XCode, you can build an XCode project. You many encounter
+a problem where [CMake cannot find the `/Developer`
+directory](http://stackoverflow.com/questions/9621706/how-can-i-resolve-error-no-developer-directory-found-at-developer).
+Resolve that issue with this command.
+
+```console
+sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
+```
 
 Possibly useful for next steps.
 
