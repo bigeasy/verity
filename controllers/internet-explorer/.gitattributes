@@ -1,0 +1,7 @@
+# Convert line endings.
+*.c             eol=lf 
+*.h             eol=lf 
+*.idl           eol=lf 
+*.js            eol=lf 
+*.def           eol=lf 
+*.txt           eol=lf 

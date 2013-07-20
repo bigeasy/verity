@@ -1,0 +1,390 @@
+#include "stdafx.h"
+
+#include "Log.h"
+#include "GenericFactory.h"
+#include "ComponentObjectModel.h"
+#include "ScriptContext.h"
+
+// {7CD57D42-C553-4B82-A52A-513082F57EE0}
+// DEFINE_GUID(CLSID_ScriptContext,
+// 0x7cd57d42, 0xc553, 0x4b82, 0xa5, 0x2a, 0x51, 0x30, 0x82, 0xf5, 0x7e, 0xe0);
+
+// {7CD57D42-C553-4B82-A52A-513082F57EE0}
+const GUID CLSID_ScriptContext = 
+{ 0x7cd57d42, 0xc553, 0x4b82,
+    { 0xa5, 0x2a, 0x51, 0x30, 0x82, 0xf5, 0x7e, 0xe0 } };
+
+// {06ADED5A-6532-4112-96EC-22FD8BA69BCF}
+static const GUID IID_IScriptContext = 
+{ 0x6aded5a, 0x6532, 0x4112, { 0x96, 0xec, 0x22, 0xfd, 0x8b, 0xa6, 0x9b, 0xcf } };
+
+
+// {9753946F-58D1-46DC-BAB1-321C00ABD037}
+static const GUID CLSID_TypeLibrary = 
+{ 0x9753946f, 0x58d1, 0x46dc,
+    { 0xba, 0xb1, 0x32, 0x1c, 0x0, 0xab, 0xd0, 0x37 } };
+
+struct InjectionMap
+{
+    CRITICAL_SECTION csInjections;
+    BSTR bstrInjections;
+};
+static struct InjectionMap InjectionMap;
+
+static DWORD *pdwLockCount;
+
+static REFIID ariidImplemented[] =
+{
+    &IID_IUnknown,
+    &IID_IDispatch,
+    &IID_IScriptContext,
+    NULL
+};
+
+
+REFERENCE_COUNT(IScriptContext, ScriptContext, pdwLockCount, NO_DESTRUCTOR)
+
+/* FIXME: Now use our common QUERY_INTERFACE. */
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_QueryInterface(IScriptContext *pSelf, REFIID riid, void **ppv)
+{
+    ScriptContext *pScriptContext = (ScriptContext*) pSelf;
+    if (IsIIDImplemented(riid, ariidImplemented))
+    {
+        *ppv = pSelf;
+        pSelf->lpVtbl->AddRef(pSelf);
+        return S_OK;
+    }
+    else
+    {
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+}
+
+/* Does not provide an actual count. Return a value of `1` through the integer
+ * pointer to indicate that type info is provided. (Does not provide an actual
+ * count](http://msdn.microsoft.com/en-us/library/aa910538.aspx) of any kind.
+ */
+static ULONG STDMETHODCALLTYPE
+IScriptContext_GetTypeInfoCount(IScriptContext *pSelf, UINT *pctinfo)
+{
+    *pctinfo = 1;
+    return 0;
+}
+
+static LPTYPEINFO TypeInfo;
+
+static HRESULT loadTypeInfo()
+{
+    HRESULT hr;
+    LPTYPELIB pTLib;
+    BSTR rgNames[128];
+    UINT cNames = 128, cActualNames;
+
+    if (!(hr = LoadRegTypeLib(&CLSID_TypeLibrary, 1, 0, 0, &pTLib)))
+    {
+        hr = pTLib->lpVtbl->GetTypeInfoOfGuid(pTLib,
+            &IID_IScriptContext, &TypeInfo);
+        /* Release the temporary type info now owned by the default
+         * type info. */
+        pTLib->lpVtbl->Release(pTLib);
+    }
+    TypeInfo->lpVtbl->GetNames(TypeInfo, 1, rgNames, cNames, &cActualNames);
+    return hr;
+}
+
+/* Type info is loaded from out type definition. */
+static ULONG STDMETHODCALLTYPE
+IScriptContext_GetTypeInfo (IScriptContext *pSelf, UINT iTInfo, LCID lcid, ITypeInfo ** ppTInfo)
+{
+    HRESULT hr;
+
+    *ppTInfo = NULL;
+
+    if (iTInfo)
+    {
+        hr = ResultFromScode(DISP_E_BADINDEX);
+    }
+    else
+    {
+        if (!TypeInfo)
+        {
+            hr = loadTypeInfo();
+        }
+
+        /* Increment the reference count to the type library we've loaded,
+         * because the caller will release it once. */ 
+        if (TypeInfo)
+        {
+            TypeInfo->lpVtbl->AddRef(TypeInfo);
+        }
+    }
+
+    return hr;
+}
+
+static ULONG STDMETHODCALLTYPE
+IScriptContext_GetIDsOfNames (IScriptContext *pSelf, REFIID refiid, LPOLESTR *rgszNames,
+        UINT cNames, LCID lcid, DISPID *rgDispId)
+{
+    HRESULT hr;
+
+    if (!TypeInfo && (hr = loadTypeInfo()))
+    {
+        return hr; 
+    }
+
+    return DispGetIDsOfNames(TypeInfo, rgszNames, cNames, rgDispId);
+}
+
+static ULONG STDMETHODCALLTYPE
+IScriptContext_Invoke (IScriptContext *pSelf, DISPID dispIdNumber, REFIID refiid,
+        LCID lcid, WORD wFlags, DISPPARAMS *pDispParams, VARIANT *pVarResult,
+        EXCEPINFO *pExcepInfo, UINT *puArgErr)
+{
+    HRESULT hr;
+    VARIANT vResult;
+
+    VariantInit(&vResult);
+
+    if (!IsEqualIID(refiid, &IID_NULL))
+    {
+        return DISP_E_UNKNOWNINTERFACE;
+    }
+
+    if (!TypeInfo && (hr = loadTypeInfo()))
+    {
+        return hr;
+    }
+
+    return DispInvoke(pSelf, TypeInfo, dispIdNumber, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_SetURL (IScriptContext *pSelf, BSTR bstrURL)
+{
+    ScriptContext *pScriptContext = (ScriptContext *) pSelf;
+    Log(L"SetURL %s\n", bstrURL);
+    if (pScriptContext->bstrURL)
+    {
+        SysFreeString(pScriptContext->bstrURL);
+    }
+    if (bstrURL)
+    {
+        pScriptContext->bstrURL = SysAllocString((OLECHAR*) bstrURL);
+    }
+    else
+    {
+        pScriptContext->bstrURL = NULL;
+    }
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_GetURL (IScriptContext *pSelf, BSTR *pbstrURL)
+{
+    ScriptContext *pScriptContext = (ScriptContext *) pSelf;
+    if (pScriptContext->bstrURL)
+    {
+        *pbstrURL = SysAllocString((OLECHAR*) pScriptContext->bstrURL);
+    }
+    else
+    {
+        *pbstrURL = NULL;
+    }
+    Log(L"GetURL %s\n", *pbstrURL);
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_SetInjections (IScriptContext *pSelf, BSTR bstrInjections)
+{
+    Log(L"SetInjections %s\n", bstrInjections);
+    EnterCriticalSection(&InjectionMap.csInjections);
+    if (InjectionMap.bstrInjections)
+    {
+        SysFreeString(InjectionMap.bstrInjections);
+    }
+    if (bstrInjections)
+    {
+        InjectionMap.bstrInjections = SysAllocString((OLECHAR*) bstrInjections);
+    }
+    else
+    {
+        InjectionMap.bstrInjections = NULL;
+    }
+    LeaveCriticalSection(&InjectionMap.csInjections);
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_GetInjections (IScriptContext *pSelf, BSTR *pbstrInjections)
+{
+    EnterCriticalSection(&InjectionMap.csInjections);
+    if (InjectionMap.bstrInjections)
+    {
+        *pbstrInjections = SysAllocString((OLECHAR*) InjectionMap.bstrInjections);
+    }
+    else
+    {
+        *pbstrInjections = NULL;
+    }
+    LeaveCriticalSection(&InjectionMap.csInjections);
+    Log(L"GetInjections %s\n", *pbstrInjections);
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_SetDocument (IScriptContext *pSelf, IDispatch *pDocument)
+{
+    ScriptContext *pScriptContext = (ScriptContext*) pSelf;
+    Log(L"SET DOCUMENT\n");
+    if (pScriptContext->pDocument)
+    {
+        pScriptContext->pDocument->lpVtbl->Release(pScriptContext->pDocument);
+        pScriptContext->pDocument = NULL;
+    }
+    if (pDocument)
+    {
+        pDocument->lpVtbl->AddRef(pDocument);
+        pScriptContext->pDocument = pDocument;
+    }
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_GetDocument (IScriptContext *pSelf, IDispatch **ppDocument)
+{
+    ScriptContext *pScriptContext = (ScriptContext*) pSelf;
+    IDispatch *pDocument = NULL;
+    if (pScriptContext->pDocument)
+    {
+        pDocument = pScriptContext->pDocument;
+        pDocument->lpVtbl->AddRef(pDocument);
+    }
+    Log(L"GET DOCUMENT: %d\n", pDocument != NULL);
+    *ppDocument = pDocument;
+    return S_OK;
+}
+
+/* Testing with a bogus object shows that the caller will decrement the
+ * reference once, without incrementing it, so if we do not increase the
+ * reference count, the script engine will send the reference count to zero,
+ * thereby releasing the XHR. */
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_CreateXHR (IScriptContext *pSelf, IDispatch** ppIDispatch)
+{
+    Log(L"CreateXHR.\n");
+    return CoCreateInstance(&CLSID_XMLHTTPRequest, NULL, CLSCTX_INPROC_SERVER,
+        &IID_IDispatch, ppIDispatch);
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_Injector (IScriptContext *pSelf, BSTR bstrInjector)
+{
+    DWORD dwCount;
+    ScriptContext *pScriptContext = (ScriptContext*) pSelf;
+    IActiveScript *pActiveScript = pScriptContext->pActiveScript;
+    Log(L"Injector! %d\n", pActiveScript == NULL);
+    pActiveScript->lpVtbl->Close(pActiveScript);
+    dwCount = pActiveScript->lpVtbl->Release(pActiveScript);
+    Log(L"Injector: %d.\n", dwCount);
+    pScriptContext->pActiveScript = NULL;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_Log(IScriptContext *pSelf, BSTR bstrMessage)
+{
+    Log(L"%s\n", bstrMessage);
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE
+IScriptContext_CreateObservable(IScriptContext *pSelf, IDispatch** ppIDispatch)
+{
+    return GenericFactory_CreateInstance(L"{3C8C461C-5543-468A-A0D2-334C6B6E54E8}", &IID_IDispatch, ppIDispatch);
+}
+
+IScriptContextVtbl ScriptContextVtbl =
+{
+    IScriptContext_QueryInterface,
+    IScriptContext_AddRef,
+    IScriptContext_Release,
+    IScriptContext_GetTypeInfoCount,
+    IScriptContext_GetTypeInfo,
+    IScriptContext_GetIDsOfNames,
+    IScriptContext_Invoke,
+    IScriptContext_SetURL,
+    IScriptContext_GetURL,
+    IScriptContext_SetInjections,
+    IScriptContext_GetInjections,
+    IScriptContext_SetDocument,
+    IScriptContext_GetDocument,
+    IScriptContext_CreateXHR,
+    IScriptContext_Injector,
+    IScriptContext_Log,
+    IScriptContext_CreateObservable
+};
+
+// Create an instance of the Verity browser helper object.
+static HRESULT
+ScriptContext_CreateInstance(
+    REFIID guidVtbl, void **ppv
+) {
+    HRESULT              hr;
+    ScriptContext       *pScriptContext;
+
+    // Allocate the memory for the Verity browser helper object.
+    if (!(pScriptContext = GlobalAlloc(GMEM_FIXED, sizeof(ScriptContext))))
+    {
+        hr = E_OUTOFMEMORY;
+    }
+    else
+    {
+        // Set the virtual function table and reference count.
+        pScriptContext->lpVtbl = &ScriptContextVtbl;
+        pScriptContext->dwCount = 1;
+        pScriptContext->bstrURL = NULL;
+        pScriptContext->pDocument = NULL;
+        pScriptContext->pActiveScript = NULL;
+
+        // Increment the library lock count.
+        InterlockedIncrement(pdwLockCount);
+
+        // Now use QueryInterface to set the caller's result pointer.
+        // QueryInterface will also check that request interface is the
+        // one supported by our Verity browser helper object.
+        hr = ScriptContextVtbl.QueryInterface(
+                (IScriptContext*) pScriptContext, guidVtbl, ppv);
+
+        // If we had a problem above, then the reference count is still
+        // one, so decrementing it will free the memory we just allocated,
+        // otherwise, it is two and decrementing it makes it as it should
+        // be.
+        ScriptContextVtbl.Release((IScriptContext*) pScriptContext);
+
+        *ppv = pScriptContext;
+    }
+    return hr;
+}
+
+void
+ScriptContext_Finalize()
+{
+    EnterCriticalSection(&InjectionMap.csInjections);
+    if (InjectionMap.bstrInjections)
+    {
+        SysFreeString(InjectionMap.bstrInjections);
+    }
+    LeaveCriticalSection(&InjectionMap.csInjections);
+    DeleteCriticalSection(&InjectionMap.csInjections);
+}
+
+HRESULT
+ScriptContext_CreateFactory()
+{
+    InitializeCriticalSection(&InjectionMap.csInjections);
+    return GenericFactory_CreateFactory(&CLSID_ScriptContext, ScriptContext_CreateInstance, ScriptContext_Finalize, &pdwLockCount);
+}

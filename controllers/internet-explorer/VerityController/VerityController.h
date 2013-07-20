@@ -1,0 +1,2 @@
+HRESULT
+ObjectWithSite_CreateFactory();
