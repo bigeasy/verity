@@ -1,3 +1,0 @@
-{ "name": "verity"
-, "dependencies": { "connect": "~2" }
-, "version": "0.0.0" }
