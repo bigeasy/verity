@@ -1,0 +1,3 @@
+[submodule "verity.safariextension/extension"]
+	path = verity.safariextension/extension
+	url = git@github.com:bigeasy/verity.git
