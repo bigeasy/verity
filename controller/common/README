@@ -1,0 +1,15 @@
+VERITY COMMON EXTENSION
+
+This is the JavaScript common to all Verity browser extensions.
+
+    Home:           http://bigeasy.github.com/verity
+    Source:         http://github.com/bigeasy/verity/tree/extension
+    Documentation:  http://github.com/bigeasy/verity/wiki
+
+    Issues:         http://github.com/bigeasy/verity/issues
+
+    License:        The MIT License
+
+PURPOSE
+
+Used to control a Verity Grid client browser.
